@@ -134,6 +134,7 @@ body {
     border: 1px solid #ddd;
     border-radius: 8px;
     font-size: 16px;
+    margin-right: 20px;
 }
 
 .table-info {
@@ -472,55 +473,4 @@ body {
 
 .place-order-btn:hover {
     background-color: #218838;
-}
-
-/* Bottom Bar */
-.bottom-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background-color: #fff;
-    padding: 15px;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    /* height: 8%; */
-}
-
-.table-status {
-    display: flex;
-    align-items: center;
-    background-color: #f9f9f9;
-    padding: 10px 15px;
-    border-radius: 25px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.table-id {
-    background-color: #ffc107;
-    color: #fff;
-    width: 35px;
-    height: 35px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 50%;
-    font-weight: 600;
-    margin-right: 10px;
-}
-
-.table-info {
-    flex-grow: 1;
-    font-size: 14px;
-    text-align: left;
-}
-
-.process-status {
-    background-color: #e3f9ed;
-    color: #28a745;
-    padding: 5px 10px;
-    border-radius: 10px;
-    font-size: 12px;
 }
