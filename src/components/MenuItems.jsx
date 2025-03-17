@@ -1,9 +1,10 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useCallback } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import { TableContext } from "../context/TableContext";
+import { useCart } from "../context/CartContext";
 
-const MenuItems = ({ selectedCategory, searchTerm }) => {
+const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,16 +12,14 @@ const MenuItems = ({ selectedCategory, searchTerm }) => {
   const [dishError, setDishError] = useState(null);
   const { accessToken } = useContext(AuthContext);
   const { selectedTableId } = useContext(TableContext);
+  const { setCartData, setCartLoading, setCartError } = useCart();
   const BASE_URL = process.env.REACT_APP_API_URL;
-  console.log(selectedTableId);
-
   const organizationId = "1e7071f0-dacb-4a98-f264-08dcb066d923";
 
   useEffect(() => {
     const fetchMenuItems = async () => {
       try {
-        if (!accessToken)
-          throw new Error("Access token missing. Please log in.");
+        if (!accessToken) throw new Error("Access token missing. Please log in.");
 
         const config = {
           headers: {
@@ -45,7 +44,34 @@ const MenuItems = ({ selectedCategory, searchTerm }) => {
     fetchMenuItems();
   }, [organizationId]);
 
-  // Function to handle "Add to Dish"
+  const fetchCartDetails = useCallback(async () => {
+    if (!selectedTableId || !organizationId || !accessToken) return;
+
+    setCartLoading(true);
+    setCartError(null);
+
+    try {
+      const config = {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      };
+
+      const response = await axios.get(
+        `${BASE_URL}Cart/get-cart-details?Guid=${selectedTableId}&OrganizationsId=${organizationId}`,
+        config
+      );
+
+      setCartData(response.data);
+      setCartLoading(false);
+    } catch (err) {
+      setCartError("Failed to fetch cart details");
+      setCartLoading(false);
+      console.error(err);
+    }
+  }, [selectedTableId, organizationId, accessToken, BASE_URL, setCartData, setCartLoading, setCartError]);
+
   const addToDish = async (product) => {
     try {
       setLoadingState((prev) => ({ ...prev, [product.id]: true }));
@@ -70,14 +96,19 @@ const MenuItems = ({ selectedCategory, searchTerm }) => {
         ordertype: 1,
       };
 
-      const response = await axios.post(
-        `${BASE_URL}Cart/add-to-cart`,
-        null,
-        { params, ...config }
-      );
+      const response = await axios.post(`${BASE_URL}Cart/add-to-cart`, null, {
+        params,
+        ...config,
+      });
 
-      console.log("Item added to dish:", response.data);
-      alert("Item added to dish successfully!");
+      // console.log("Item added to dish:", response.data);
+      // alert("Item added to dish successfully!");
+
+      // Refetch cart and table data
+      await fetchCartDetails();
+      if (refetchTables) {
+        await refetchTables(); // Refetch tables to update item count
+      }
     } catch (err) {
       setDishError("Failed to add item to dish");
       console.error("Error adding to dish:", err);
@@ -89,7 +120,6 @@ const MenuItems = ({ selectedCategory, searchTerm }) => {
   if (loading) return <p>Loading menu items...</p>;
   if (error) return <p>{error}</p>;
 
-  // Filter items based on selected category and search term
   const filteredItems = items
     .filter((item) =>
       selectedCategory === "all" ? true : item.categoryId === selectedCategory
@@ -109,9 +139,7 @@ const MenuItems = ({ selectedCategory, searchTerm }) => {
           key={item.id}
           className={`menu-item ${item.discount ? "highlighted" : ""}`}
         >
-          {item.discount && (
-            <div className="discount-label">{item.discount}</div>
-          )}
+          {item.discount && <div className="discount-label">{item.discount}</div>}
           <img src={item.image} alt={item.name} className="item-image" />
           <div className="item-info">
             <h4 className="item-name">{item.name}</h4>

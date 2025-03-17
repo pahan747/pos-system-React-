@@ -39,6 +39,7 @@
 .bottom-bar {
   -ms-overflow-style: none; /* Hide scrollbar in IE and Edge */
   scrollbar-width: thin; /* Minimal scrollbar in Firefox */
+  height: 90px;
 }
 
 /* Table Status */
@@ -48,8 +49,8 @@
   padding: 1vh 1.5vw;
   border-radius: 25px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  min-width: 200px; /* Fixed minimum width */
-  max-width: 300px; /* Capped size */
+  min-width: 350px;
+  max-width: 400px;
   justify-content: space-between;
   margin-right: 1vw;
   background-color: #f9f9f9;

@@ -1,20 +1,28 @@
-import React, { useState } from 'react';
-import OrderSummary from './OrderSummary';
-import BottomBar from './BottomBar';
+// src/components/TableOrderManager.js
+import React, { useState } from "react";
+import OrderSummary from "./OrderSummary";
+import BottomBar from "./BottomBar";
 
-
-const TableOrderManager = () => {
+const TableOrderManager = ({ onRefetchTables }) => {
   const [selectedTable, setSelectedTable] = useState(null);
+  const [refetchTablesFn, setRefetchTablesFn] = useState(null);
 
   const handleTableSelect = (table) => {
     setSelectedTable(table);
   };
 
+  const handleRefetchTables = (fetchFn) => {
+    setRefetchTablesFn(() => fetchFn); // Store the fetchTables function
+    if (onRefetchTables) {
+      onRefetchTables(fetchFn); // Pass it up to HomePage if needed
+    }
+  };
+
   return (
     <div className="app-container">
       <div className="main-content">
-        <OrderSummary selectedTable={selectedTable} />
-        <BottomBar onTableSelect={handleTableSelect} />
+        <OrderSummary selectedTable={selectedTable} refetchTables={refetchTablesFn} />
+        <BottomBar onTableSelect={handleTableSelect} onRefetchTables={handleRefetchTables} />
       </div>
     </div>
   );
