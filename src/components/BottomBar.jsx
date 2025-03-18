@@ -4,6 +4,7 @@ import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import "../assets/css/components/BottomBar.css";
 import { TableContext } from "../context/TableContext";
+import { useServiceType } from '../context/ServiceTypeContext';
 
 const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   const [tables, setTables] = useState([]);
@@ -11,6 +12,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   const [error, setError] = useState(null);
   const { accessToken } = useContext(AuthContext);
   const { setSelectedTableId } = useContext(TableContext);
+  const { selectedServiceType } = useServiceType();
   const BASE_URL = process.env.REACT_APP_API_URL;
 
   const organizationId = "1e7071f0-dacb-4a98-f264-08dcb066d923";
@@ -81,30 +83,72 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     onTableSelect(table);
   };
 
-  if (loading) return <div>Loading tables...</div>;
-  if (error) return <div>{error}</div>;
-
-  return (
-    <div className="bottom-bar">
-      {tables.map((table, index) => (
-        <div
-          key={index}
-          className="table-status"
-          onClick={() => handleTableClick(table)}
-          style={{ cursor: "pointer" }}
-        >
-          <span className="table-id">{table.tableId}</span>
-          <div className="table-info">
-            <p>{table.name}</p>
-            <p>{table.items}.0 items</p>
+  const renderBottomBar = () => {
+    switch (selectedServiceType) {
+      case 'Dine in':
+        if (loading) return <div>Loading tables...</div>;
+        if (error) return <div>{error}</div>;
+        
+        return (
+          <div className="bottom-bar">
+            {tables.map((table, index) => (
+              <div
+                key={index}
+                className="table-status"
+                onClick={() => handleTableClick(table)}
+                style={{ cursor: "pointer" }}
+              >
+                <span className="table-id">{table.tableId}</span>
+                <div className="table-info">
+                  <p>{table.name}</p>
+                  <p>{table.items}.0 items</p>
+                </div>
+                <span className={`process-status ${table.status}`}>
+                  {table.status}
+                </span>
+              </div>
+            ))}
           </div>
-          <span className={`process-status ${table.status}`}>
-            {table.status}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
+        );
+
+      case 'Take Away':
+        return (
+          <div className="bottom-bar take-away">
+            <div className="pickup-info">
+              <i className="fas fa-shopping-bag"></i>
+              <span>Pickup Order</span>
+            </div>
+            <div className="actions">
+              <button className="track-order">
+                <i className="fas fa-clock"></i>
+                Track Order
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'Delivery':
+        return (
+          <div className="bottom-bar delivery">
+            <div className="delivery-info">
+              <i className="fas fa-motorcycle"></i>
+              <span>Delivery Status</span>
+            </div>
+            <div className="actions">
+              <button className="track-delivery">
+                <i className="fas fa-map-marker-alt"></i>
+                Track Delivery
+              </button>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return renderBottomBar();
 };
 
 export default BottomBar;

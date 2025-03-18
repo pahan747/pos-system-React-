@@ -6,8 +6,9 @@ import OrganizationDropdown from "../components/OrganizationDropdown";
 import { Input } from "antd";
 import TableOrderManager from "../components/TableOrderManager";
 import { CartProvider } from "../context/CartContext";
+import { ServiceTypeProvider } from "../context/ServiceTypeContext";
 
-const HomePage = () => {
+const HomePageContent = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [refetchTablesFn, setRefetchTablesFn] = useState(null);
 
@@ -20,23 +21,31 @@ const HomePage = () => {
   };
 
   return (
+    <div className="container">
+      <Sidebar />
+      <main className="main-content">
+        <header className="header">
+          <Input
+            placeholder="Search Product here..."
+            className="search-bar"
+            style={{ width: "100%", height: 43 }}
+            onChange={handleSearch}
+          />
+          <OrganizationDropdown />
+        </header>
+        <Menu searchTerm={searchTerm} refetchTables={refetchTablesFn} />
+      </main>
+      <TableOrderManager onRefetchTables={handleRefetchTables} />
+    </div>
+  );
+};
+
+const HomePage = () => {
+  return (
     <CartProvider>
-      <div className="container">
-        <Sidebar />
-        <main className="main-content">
-          <header className="header">
-            <Input
-              placeholder="Search Product here..."
-              className="search-bar"
-              style={{ width: "100%", height: 43 }}
-              onChange={handleSearch}
-            />
-            <OrganizationDropdown />
-          </header>
-          <Menu searchTerm={searchTerm} refetchTables={refetchTablesFn} />
-        </main>
-        <TableOrderManager onRefetchTables={handleRefetchTables} />
-      </div>
+      <ServiceTypeProvider>
+        <HomePageContent />
+      </ServiceTypeProvider>
     </CartProvider>
   );
 };

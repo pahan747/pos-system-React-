@@ -50,8 +50,42 @@
 
 .service-buttons {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 24px;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.type-filter-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.type-btn {
+  padding: 8px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fff;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.type-btn:hover {
+  background: #f5f5f5;
+  border-color: #d0d0d0;
+}
+
+.type-btn.active {
+  background: #52c41a;
+  color: white;
+  border-color: #52c41a;
+}
+
+.type-btn.active:hover {
+  background: #389e0d;
+  border-color: #389e0d;
 }
 
 .service-btn {
@@ -443,4 +477,65 @@
   .totals h3 {
     font-size: 20px;
   }
+}
+
+.loading-state,
+.error-state,
+.no-items-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  min-height: 200px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.loading-state i,
+.error-state i,
+.no-items-state i {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.loading-state i {
+  color: #1890ff;
+}
+
+.error-state i {
+  color: #ff4d4f;
+}
+
+.no-items-state i {
+  color: #8c8c8c;
+}
+
+.loading-state p,
+.error-state p,
+.no-items-state p {
+  margin: 0;
+  font-size: 1rem;
+  color: #262626;
+}
+
+.no-items-state .sub-text {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #8c8c8c;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-state i.fa-spinner {
+  animation: spin 1s linear infinite;
 }

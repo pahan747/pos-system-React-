@@ -11,6 +11,7 @@ import PaymentKeypad from "./PaymentKeypad";
 import CardTypeSelector from "./CardTypeSelector";
 import PaymentModal from "./PaymentModal";
 import { Typography } from "antd";
+import { useServiceType } from '../context/ServiceTypeContext';
 
 const { Title, Text } = Typography;
 
@@ -19,6 +20,7 @@ const OrderSummary = ({ selectedTable }) => {
   const { selectedTableId } = useContext(TableContext);
   const { accessToken } = useContext(AuthContext);
   const { cartData, setCartData, cartLoading, setCartLoading, cartError, setCartError } = useCart();
+  const { selectedServiceType, setSelectedServiceType } = useServiceType();
   const BASE_URL = process.env.REACT_APP_API_URL;
   const tableName = selectedTable ? selectedTable.name : "No table selected";
   const tableId = selectedTable ? selectedTable.id : selectedTableId;
@@ -29,98 +31,126 @@ const OrderSummary = ({ selectedTable }) => {
   const [amountEntered, setAmountEntered] = useState("0.00");
   const [discount, setDiscount] = useState("0");
   const [selectedCardType, setSelectedCardType] = useState(null);
+  const [filteredCartDetails, setFilteredCartDetails] = useState([]);
 
   const fetchCartDetails = useCallback(async () => {
     if (!tableId || !selectedOrganizationId || !accessToken) {
       setCartData(null);
       return;
     }
-    
+
     setCartLoading(true);
     setCartError(null);
-    
+
     try {
       const response = await axios.get(
         `${BASE_URL}Cart/get-cart-details?Guid=${tableId}&OrganizationsId=${selectedOrganizationId}`,
         { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
       );
-      
+
+      console.log("API Response:", response.data); // Debugging
+
       setCartData({
         ...response.data,
         cartDetails: response.data.cartDetails.map((item) => ({ ...item })),
       });
     } catch (err) {
       setCartError("Failed to fetch cart details");
-      console.error(err);
+      console.error("Fetch Error:", err);
     } finally {
       setCartLoading(false);
     }
   }, [tableId, selectedOrganizationId, accessToken, BASE_URL, setCartData, setCartLoading, setCartError]);
 
+  const filterCartDetails = useCallback(() => {
+    if (!cartData || !cartData.cartDetails) {
+      setFilteredCartDetails([]);
+      return;
+    }
+
+    const serviceTypeMap = {
+      "Dine in": 0,
+      "Take Away": 1,
+      "Delivery": 2,
+    };
+    const selectedType = serviceTypeMap[selectedServiceType];
+
+    const filtered = cartData.type === selectedType ? cartData.cartDetails : [];
+    console.log("Filtered Cart Details:", filtered); // Debugging
+    setFilteredCartDetails(filtered);
+  }, [cartData, selectedServiceType]);
+
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadCartDetails = async () => {
       if (!isMounted) return;
       await fetchCartDetails();
     };
-    
+
     loadCartDetails();
-    
+
     return () => {
       isMounted = false;
     };
   }, [fetchCartDetails]);
 
-  // Handle note input change (local state only)
+  useEffect(() => {
+    filterCartDetails();
+  }, [cartData, selectedServiceType, filterCartDetails]);
+
+  const handleServiceTypeChange = (service) => {
+    setSelectedServiceType(service);
+  };
+
   const handleNoteInputChange = (index, value) => {
-    const item = cartData.cartDetails[index];
-    if (item.isKot !== 0) return; // Only allow editing if isKot is 0
-    
+    const item = filteredCartDetails[index];
+    if (item.isKot !== 0) return;
+
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
-      newCartDetails[index].note = value;
+      const itemIndex = prev.cartDetails.findIndex((i) => i.id === item.id);
+      newCartDetails[itemIndex].note = value;
       return { ...prev, cartDetails: newCartDetails };
     });
   };
 
-  // Handle quantity increase
   const handleQuantityIncrease = (index) => {
-    const item = cartData.cartDetails[index];
-    if (item.isKot !== 0) return; // Only allow increase if isKot is 0
+    const item = filteredCartDetails[index];
+    if (item.isKot !== 0) return;
 
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
-      newCartDetails[index].qty += 1;
+      const itemIndex = prev.cartDetails.findIndex((i) => i.id === item.id);
+      newCartDetails[itemIndex].qty += 1;
       return { ...prev, cartDetails: newCartDetails };
     });
   };
 
-  // Handle quantity decrease  
   const handleQuantityDecrease = (index) => {
-    const item = cartData.cartDetails[index];
-    if (item.isKot !== 0 || item.qty <= 1) return; // Only allow decrease if isKot is 0 and qty > 1
+    const item = filteredCartDetails[index];
+    if (item.isKot !== 0 || item.qty <= 1) return;
 
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
-      newCartDetails[index].qty -= 1;
+      const itemIndex = prev.cartDetails.findIndex((i) => i.id === item.id);
+      newCartDetails[itemIndex].qty -= 1;
       return { ...prev, cartDetails: newCartDetails };
     });
   };
 
-  // Handle note addition to database (on button click)
   const handleAddNoteToDatabase = async (index) => {
-    const item = cartData.cartDetails[index];
-    if (item.isKot !== 0) return; // Only allow adding note if isKot is 0
+    const item = filteredCartDetails[index];
+    if (item.isKot !== 0) return;
 
-    const noteValue = cartData.cartDetails[index].note || "";
+    const noteValue = item.note || "";
     try {
       await axios.post(
         `${BASE_URL}Cart/add-note`,
-        { cartDetailId: cartData.cartDetails[index].id, note: noteValue },
+        { cartDetailId: item.id, note: noteValue },
         { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
       );
-      await fetchCartDetails(); // Refresh data after update
+      await fetchCartDetails();
     } catch (err) {
       setCartError("Failed to add note.");
       console.error(err);
@@ -141,7 +171,7 @@ const OrderSummary = ({ selectedTable }) => {
       return;
     }
 
-    if (!cartData?.cartDetails?.length) {
+    if (!filteredCartDetails.length) {
       message.warning("No items in cart to place order");
       return;
     }
@@ -152,11 +182,8 @@ const OrderSummary = ({ selectedTable }) => {
         {},
         { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
       );
-      
-      // Refresh cart details after placing order
       await fetchCartDetails();
       message.success("Order placed successfully!");
-      
     } catch (err) {
       message.error("Failed to place order");
       console.error(err);
@@ -169,7 +196,7 @@ const OrderSummary = ({ selectedTable }) => {
       return;
     }
 
-    if (!cartData?.cartDetails?.length) {
+    if (!filteredCartDetails.length) {
       message.warning("No items in cart to finish order");
       return;
     }
@@ -182,7 +209,7 @@ const OrderSummary = ({ selectedTable }) => {
   const handlePaymentConfirm = async (method) => {
     try {
       const paymentTypeMap = { Cash: 0, Card: 1, QR: 2 };
-      const details = cartData.cartDetails
+      const details = filteredCartDetails
         .filter((item) => item.qty > 0 && item.price > 0)
         .map((item) => ({
           productId: item.productId || "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -190,7 +217,7 @@ const OrderSummary = ({ selectedTable }) => {
           price: item.price || 0,
           amount: (item.qty || 0) * (item.price || 0),
           status: 0,
-          spicy: ""
+          spicy: "",
         }));
 
       const subTotal = parseFloat(cartData?.subTotal || "0.00");
@@ -205,7 +232,7 @@ const OrderSummary = ({ selectedTable }) => {
       const orderData = {
         invoiceNumber: `INV-${Date.now()}`,
         tableId: tableId || "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-        type: 0,
+        type: ["Dine in", "Take Away", "Delivery"].indexOf(selectedServiceType),
         paymentType: paymentTypeMap[method],
         status: 0,
         dueDate: new Date().toISOString(),
@@ -219,19 +246,20 @@ const OrderSummary = ({ selectedTable }) => {
         paidAmount: parseFloat(amountEntered),
         customerID: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
         organizationId: selectedOrganizationId,
-        details: details
+        details: details,
       };
 
       const response = await axios.post(`${BASE_URL}Invoice/create-invoice-new`, orderData, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       });
 
       if (response.status === 200 || response.status === 201) {
         message.success(`Payment successful via ${method}!`);
         setCartData(null);
+        setFilteredCartDetails([]);
         setShowCashModal(false);
         setShowCardModal(false);
         setShowQRModal(false);
@@ -246,7 +274,7 @@ const OrderSummary = ({ selectedTable }) => {
       console.error("Payment error details:", {
         response: err.response?.data,
         status: err.response?.status,
-        message: err.message
+        message: err.message,
       });
       message.error("Failed to process payment. Please try again.");
     }
@@ -275,81 +303,91 @@ const OrderSummary = ({ selectedTable }) => {
       </div>
       <div className="service-buttons">
         {["Dine in", "Take Away", "Delivery"].map((service) => (
-          <button key={service} className={`service-btn ${service === "Dine in" ? "active" : ""}`}>
+          <button
+            key={service}
+            className={`service-btn ${selectedServiceType === service ? "active" : ""}`}
+            onClick={() => handleServiceTypeChange(service)}
+          >
             {service}
           </button>
         ))}
       </div>
 
-      {cartLoading ? (
-        <div>Loading...</div>
-      ) : cartError ? (
-        <div>{cartError}</div>
-      ) : (
-        <>
-          <div className="order-items">
-            {cartData?.cartDetails?.length > 0 ? (
-              cartData.cartDetails.map((item, index) => (
-                <div key={index} className="order-item">
-                  <img src={item.image} alt={item.name} />
-                  <div className="order-details">
-                    <h4>{item.name}</h4>
-                    <div className="order-price">
-                      <span>${(item.price || 0).toFixed(2)}</span>
-                      <div className="quantity-controls">
-                        <button 
-                          className="qty-btn decrease" 
-                          disabled={item.qty <= 1 || item.isKot !== 0}
-                          onClick={() => handleQuantityDecrease(index)}
-                        >
-                          -
-                        </button>
-                        <span>{item.qty}x</span>
-                        <button 
-                          className="qty-btn increase"
-                          disabled={item.isKot !== 0}
-                          onClick={() => handleQuantityIncrease(index)}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                    <div className="input-container">
-                      <Input
-                        placeholder="Add notes"
-                        value={item.note || ""} 
-                        onChange={(e) => handleNoteInputChange(index, e.target.value)}
-                        disabled={item.isKot !== 0}
-                        style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
-                      />
-                      <button
-                        className="add-note-btn"
-                        onClick={() => handleAddNoteToDatabase(index)}
-                        disabled={item.isKot !== 0}
-                      >
-                        Add
-                      </button>
-                    </div>
+      <div className="order-items">
+        {cartLoading ? (
+          <div className="loading-state">
+            <i className="fas fa-spinner fa-spin"></i>
+            <p>Loading cart items...</p>
+          </div>
+        ) : cartError ? (
+          <div className="error-state">
+            <i className="fas fa-exclamation-circle"></i>
+            <p>{cartError}</p>
+          </div>
+        ) : filteredCartDetails.length > 0 ? (
+          filteredCartDetails.map((item, index) => (
+            <div key={index} className="order-item">
+              <img src={item.image} alt={item.name} />
+              <div className="order-details">
+                <h4>{item.name}</h4>
+                <div className="order-price">
+                  <span>${(item.price || 0).toFixed(2)}</span>
+                  <div className="quantity-controls">
+                    <button
+                      className="qty-btn decrease"
+                      disabled={item.qty <= 1 || item.isKot !== 0}
+                      onClick={() => handleQuantityDecrease(index)}
+                    >
+                      -
+                    </button>
+                    <span>{item.qty}x</span>
+                    <button
+                      className="qty-btn increase"
+                      disabled={item.isKot !== 0}
+                      onClick={() => handleQuantityIncrease(index)}
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
-                
-              ))
-            ) : (
-              <p>No items in cart</p>
-            )}
-          </div>
-          {cartData && (
-            <div className="totals">
-              <p>SubTotal: <span>${(cartData.subTotal || 0).toFixed(2)}</span></p>
-              <p>Tax: <span>${(cartData.tax || 0).toFixed(2)}</span></p>
-              <p>Service: <span>${(cartData.service || 0).toFixed(2)}</span></p>
-              {(cartData.discount || 0) > 0 && (
-                <p>Discount: <span>-${(cartData.discount || 0).toFixed(2)}</span></p>
-              )}
-              <h3>Total: <span>${(cartData.subTotal || 0).toFixed(2)}</span></h3>
+                <div className="input-container">
+                  <Input
+                    placeholder="Add notes"
+                    value={item.note || ""}
+                    onChange={(e) => handleNoteInputChange(index, e.target.value)}
+                    disabled={item.isKot !== 0}
+                    style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
+                  />
+                  <button
+                    className="add-note-btn"
+                    onClick={() => handleAddNoteToDatabase(index)}
+                    disabled={item.isKot !== 0}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
             </div>
+          ))
+        ) : (
+          <div className="no-items-state">
+            <i className="fas fa-shopping-cart"></i>
+            <p>No items in cart for {selectedServiceType}</p>
+            <p className="sub-text">Add items to get started</p>
+          </div>
+        )}
+      </div>
+
+      {cartData && !cartLoading && filteredCartDetails.length > 0 && (
+        <div className="totals">
+          <p>SubTotal: <span>${(cartData.subTotal || 0).toFixed(2)}</span></p>
+          <p>Tax: <span>${(cartData.tax || 0).toFixed(2)}</span></p>
+          <p>Service: <span>${(cartData.service || 0).toFixed(2)}</span></p>
+          {(cartData.discount || 0) > 0 && (
+            <p>Discount: <span>-${(cartData.discount || 0).toFixed(2)}</span></p>
           )}
-        </>
+          <h3>Total: <span>${(cartData.subTotal || 0).toFixed(2)}</span></h3>
+        </div>
       )}
 
       <div className="payment-options">
@@ -373,10 +411,7 @@ const OrderSummary = ({ selectedTable }) => {
         Place Order
       </button>
 
-      <button
-        className="finish-order-btn"
-        onClick={handleFinishOrder}
-      >
+      <button className="finish-order-btn" onClick={handleFinishOrder}>
         Finish Order
       </button>
 
