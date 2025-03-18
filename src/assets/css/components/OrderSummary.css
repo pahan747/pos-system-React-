@@ -50,8 +50,9 @@
 
 .service-buttons {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 15px;
+  flex-wrap: nowrap;
 }
 
 .type-filter-buttons {
@@ -90,7 +91,9 @@
 
 .service-btn {
   flex: 1;
-  padding: 12px;
+  white-space: nowrap;
+  padding: 12px 8px;
+  min-width: 80px;
   margin: 0 6px;
   border: none;
   background: #ecf0f1;
@@ -115,10 +118,18 @@
 
 .order-items {
   margin-bottom: 24px;
-  max-height: 300px;
+  max-height: calc(100vh - 500px);
+  min-height: 200px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #1abc9c #ecf0f1;
+  padding-right: 8px;
+  position: relative;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.order-items.transitioning {
+  opacity: 0.5;
 }
 
 .order-items::-webkit-scrollbar {
@@ -308,12 +319,15 @@
 
 .payment-options {
   display: flex;
-  gap: 10px; /* Space between buttons */
-  margin: 15px 10px 0; /* Margin around the payment options */
+  gap: 8px;
+  margin: 15px 0;
+  flex-wrap: wrap;
 }
 
 .payment-btn {
-  flex: 1; /* Equal width for all buttons */
+  flex: 1;
+  min-width: 100px;
+  white-space: nowrap;
   padding: 10px 15px;
   font-size: 16px;
   border: 1px solid #d9d9d9; /* Default border */
@@ -492,12 +506,23 @@
   background-color: #f9f9f9;
   border-radius: 8px;
   margin: 1rem 0;
+  border: 1px solid #f0f0f0;
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  transform: translateY(0);
+}
+
+.transitioning .loading-state,
+.transitioning .error-state,
+.transitioning .no-items-state {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 .loading-state i,
 .error-state i,
 .no-items-state i {
-  font-size: 2rem;
+  font-size: 3rem;
   margin-bottom: 1rem;
 }
 
@@ -517,14 +542,16 @@
 .error-state p,
 .no-items-state p {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.1rem;
   color: #262626;
+  font-weight: 500;
 }
 
 .no-items-state .sub-text {
   margin-top: 0.5rem;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: #8c8c8c;
+  font-weight: normal;
 }
 
 @keyframes spin {
@@ -538,4 +565,81 @@
 
 .loading-state i.fa-spinner {
   animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+.retry-button {
+  margin-top: 1rem;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background-color: #1890ff;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.retry-button:hover {
+  background-color: #096dd9;
+}
+
+.retry-button i {
+  font-size: 0.9rem;
+  margin: 0;
+  color: white;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.loading-state,
+.error-state,
+.no-items-state {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Improve mobile responsiveness */
+@media (max-width: 480px) {
+  .order-summary {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+    padding: 16px;
+  }
+
+  .order-items {
+    max-height: calc(100vh - 400px);
+  }
+
+  .service-buttons,
+  .payment-options {
+    gap: 6px;
+  }
+
+  .service-btn,
+  .payment-btn {
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  .order-item {
+    padding: 8px;
+  }
+
+  .order-item img {
+    width: 70px;
+    height: 70px;
+  }
 }

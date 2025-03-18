@@ -32,6 +32,7 @@ const OrderSummary = ({ selectedTable }) => {
   const [discount, setDiscount] = useState("0");
   const [selectedCardType, setSelectedCardType] = useState(null);
   const [filteredCartDetails, setFilteredCartDetails] = useState([]);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const fetchCartDetails = useCallback(async () => {
     if (!tableId || !selectedOrganizationId || !accessToken) {
@@ -75,8 +76,10 @@ const OrderSummary = ({ selectedTable }) => {
     };
     const selectedType = serviceTypeMap[selectedServiceType];
 
-    const filtered = cartData.type === selectedType ? cartData.cartDetails : [];
-    console.log("Filtered Cart Details:", filtered); // Debugging
+    // Check if cartData.type is an array or single value
+    const cartTypes = Array.isArray(cartData.type) ? cartData.type : [cartData.type];
+    const filtered = cartTypes.includes(selectedType) ? cartData.cartDetails : [];
+    
     setFilteredCartDetails(filtered);
   }, [cartData, selectedServiceType]);
 
@@ -85,7 +88,14 @@ const OrderSummary = ({ selectedTable }) => {
 
     const loadCartDetails = async () => {
       if (!isMounted) return;
+      setIsTransitioning(true);
       await fetchCartDetails();
+      // Add a small delay before removing transition state
+      setTimeout(() => {
+        if (isMounted) {
+          setIsTransitioning(false);
+        }
+      }, 300);
     };
 
     loadCartDetails();
@@ -96,11 +106,20 @@ const OrderSummary = ({ selectedTable }) => {
   }, [fetchCartDetails]);
 
   useEffect(() => {
-    filterCartDetails();
+    setIsTransitioning(true);
+    // Add a small delay before filtering to ensure smooth transition
+    const timer = setTimeout(() => {
+      filterCartDetails();
+      setIsTransitioning(false);
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [cartData, selectedServiceType, filterCartDetails]);
 
   const handleServiceTypeChange = (service) => {
+    setIsTransitioning(true);
     setSelectedServiceType(service);
+    setCartError(null);
   };
 
   const handleNoteInputChange = (index, value) => {
@@ -294,6 +313,97 @@ const OrderSummary = ({ selectedTable }) => {
     }
   };
 
+  const renderOrderContent = () => {
+    if (cartLoading || isTransitioning) {
+      return (
+        <div className="loading-state">
+          <i className="fas fa-spinner fa-spin"></i>
+          <p>Loading cart items...</p>
+        </div>
+      );
+    }
+
+    if (cartError) {
+      return (
+        <div className="error-state">
+          <i className="fas fa-exclamation-circle"></i>
+          <p>{cartError}</p>
+          <button 
+            className="retry-button"
+            onClick={fetchCartDetails}
+          >
+            <i className="fas fa-redo"></i> Retry
+          </button>
+        </div>
+      );
+    }
+
+    if (!cartData) {
+      return (
+        <div className="no-items-state">
+          <i className="fas fa-shopping-cart"></i>
+          <p>No cart data available</p>
+          <p className="sub-text">Please select a table to view orders</p>
+        </div>
+      );
+    }
+
+    if (filteredCartDetails.length === 0) {
+      return (
+        <div className="no-items-state">
+          <i className="fas fa-shopping-cart"></i>
+          <p>No items in cart for {selectedServiceType}</p>
+          <p className="sub-text">Add items to get started</p>
+        </div>
+      );
+    }
+
+    return filteredCartDetails.map((item, index) => (
+      <div key={item.id || index} className="order-item">
+        <img src={item.image} alt={item.name} />
+        <div className="order-details">
+          <h4>{item.name}</h4>
+          <div className="order-price">
+            <span>${(item.price || 0).toFixed(2)}</span>
+            <div className="quantity-controls">
+              <button
+                className="qty-btn decrease"
+                disabled={item.qty <= 1 || item.isKot !== 0}
+                onClick={() => handleQuantityDecrease(index)}
+              >
+                -
+              </button>
+              <span>{item.qty}x</span>
+              <button
+                className="qty-btn increase"
+                disabled={item.isKot !== 0}
+                onClick={() => handleQuantityIncrease(index)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div className="input-container">
+            <Input
+              placeholder="Add notes"
+              value={item.note || ""}
+              onChange={(e) => handleNoteInputChange(index, e.target.value)}
+              disabled={item.isKot !== 0}
+              style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
+            />
+            <button
+              className="add-note-btn"
+              onClick={() => handleAddNoteToDatabase(index)}
+              disabled={item.isKot !== 0}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+    ));
+  };
+
   return (
     <aside className="order-summary">
       <div className="table-header">
@@ -313,69 +423,8 @@ const OrderSummary = ({ selectedTable }) => {
         ))}
       </div>
 
-      <div className="order-items">
-        {cartLoading ? (
-          <div className="loading-state">
-            <i className="fas fa-spinner fa-spin"></i>
-            <p>Loading cart items...</p>
-          </div>
-        ) : cartError ? (
-          <div className="error-state">
-            <i className="fas fa-exclamation-circle"></i>
-            <p>{cartError}</p>
-          </div>
-        ) : filteredCartDetails.length > 0 ? (
-          filteredCartDetails.map((item, index) => (
-            <div key={index} className="order-item">
-              <img src={item.image} alt={item.name} />
-              <div className="order-details">
-                <h4>{item.name}</h4>
-                <div className="order-price">
-                  <span>${(item.price || 0).toFixed(2)}</span>
-                  <div className="quantity-controls">
-                    <button
-                      className="qty-btn decrease"
-                      disabled={item.qty <= 1 || item.isKot !== 0}
-                      onClick={() => handleQuantityDecrease(index)}
-                    >
-                      -
-                    </button>
-                    <span>{item.qty}x</span>
-                    <button
-                      className="qty-btn increase"
-                      disabled={item.isKot !== 0}
-                      onClick={() => handleQuantityIncrease(index)}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-                <div className="input-container">
-                  <Input
-                    placeholder="Add notes"
-                    value={item.note || ""}
-                    onChange={(e) => handleNoteInputChange(index, e.target.value)}
-                    disabled={item.isKot !== 0}
-                    style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
-                  />
-                  <button
-                    className="add-note-btn"
-                    onClick={() => handleAddNoteToDatabase(index)}
-                    disabled={item.isKot !== 0}
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="no-items-state">
-            <i className="fas fa-shopping-cart"></i>
-            <p>No items in cart for {selectedServiceType}</p>
-            <p className="sub-text">Add items to get started</p>
-          </div>
-        )}
+      <div className={`order-items ${isTransitioning ? 'transitioning' : ''}`}>
+        {renderOrderContent()}
       </div>
 
       {cartData && !cartLoading && filteredCartDetails.length > 0 && (
