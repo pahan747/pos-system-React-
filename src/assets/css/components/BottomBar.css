@@ -7,10 +7,6 @@
   height: 90px;
   background-color: #fff;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-}
-
-/* Original Table List Styles */
-.bottom-bar {
   display: flex;
   justify-content: flex-start;
   align-items: center;
@@ -111,79 +107,45 @@
   color: white;
 }
 
-/* Take Away and Delivery Bar Styles */
-.bottom-bar.take-away,
-.bottom-bar.delivery {
-  height: 60px;
-  padding: 0 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  overflow: visible;
-  white-space: normal;
-  cursor: default;
-}
-
-.bottom-bar.take-away {
-  border-top: 3px solid #52c41a;
-}
-
-.bottom-bar.delivery {
-  border-top: 3px solid #722ed1;
-}
-
-/* Icons for Take Away and Delivery */
-.bottom-bar.take-away i,
-.bottom-bar.delivery i {
-  margin-right: 8px;
-  font-size: 18px;
-}
-
-/* Buttons for Take Away and Delivery */
-.bottom-bar.take-away button,
-.bottom-bar.delivery button {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  transition: all 0.2s ease;
-}
-
-.take-away button {
-  background-color: #52c41a;
-  color: white;
-}
-
-.delivery button {
-  background-color: #722ed1;
-  color: white;
-}
-
-.bottom-bar.take-away button:hover,
-.bottom-bar.delivery button:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Info sections for Take Away and Delivery */
-.pickup-info,
-.delivery-info {
-  display: flex;
-  align-items: center;
-}
-
-.pickup-info span,
-.delivery-info span {
-  font-size: 16px;
-  font-weight: 500;
-}
-
+/* Actions */
 .actions {
   display: flex;
   gap: 10px;
+}
+
+/* Add Order Button */
+.add-order-btn {
+  background-color: #52c41a;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.add-order-btn i {
+  font-size: 14px;
+  background-color: rgba(255, 255, 255, 0.2);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 4px;
+}
+
+.add-order-btn:hover {
+  background-color: #389e0d;
+}
+
+.add-order-btn:hover i {
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 @media (max-width: 480px) {

@@ -4,10 +4,11 @@ import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import "../assets/css/components/BottomBar.css";
 import { TableContext } from "../context/TableContext";
-import { useServiceType } from '../context/ServiceTypeContext';
+import { useServiceType } from "../context/ServiceTypeContext";
 
 const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   const [tables, setTables] = useState([]);
+  const [takeAwayOrders, setTakeAwayOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { accessToken } = useContext(AuthContext);
@@ -58,14 +59,14 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadTables = async () => {
       if (!isMounted) return;
       await fetchTables();
     };
-    
+
     loadTables();
-    
+
     return () => {
       isMounted = false;
     };
@@ -83,12 +84,24 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     onTableSelect(table);
   };
 
+  const handleAddTakeAwayOrder = () => {
+    const newOrder = {
+      id: `takeaway-${takeAwayOrders.length + 1}`,
+      tableId: `TA-${takeAwayOrders.length + 1}`,
+      name: `Take Away #${takeAwayOrders.length + 1}`,
+      items: 0,
+      status: "Open"
+    };
+    setTakeAwayOrders([...takeAwayOrders, newOrder]);
+    handleTableClick(newOrder);
+  };
+
   const renderBottomBar = () => {
     switch (selectedServiceType) {
-      case 'Dine in':
+      case "Dine in":
         if (loading) return <div>Loading tables...</div>;
         if (error) return <div>{error}</div>;
-        
+
         return (
           <div className="bottom-bar">
             {tables.map((table, index) => (
@@ -111,23 +124,42 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
           </div>
         );
 
-      case 'Take Away':
+      case "Take Away":
         return (
-          <div className="bottom-bar take-away">
-            <div className="pickup-info">
-              <i className="fas fa-shopping-bag"></i>
-              <span>Pickup Order</span>
-            </div>
-            <div className="actions">
-              <button className="track-order">
-                <i className="fas fa-clock"></i>
-                Track Order
-              </button>
+          <div className="bottom-bar">
+            {takeAwayOrders.map((order, index) => (
+              <div
+                key={index}
+                className="table-status"
+                onClick={() => handleTableClick(order)}
+                style={{ cursor: "pointer" }}
+              >
+                <span className="table-id">{order.tableId}</span>
+                <div className="table-info">
+                  <p>{order.name}</p>
+                  <p>{order.items}.0 items</p>
+                </div>
+                <span className={`process-status ${order.status}`}>
+                  {order.status}
+                </span>
+              </div>
+            ))}
+            <div 
+              className="table-status" 
+              onClick={handleAddTakeAwayOrder}
+              style={{ cursor: "pointer" }}
+            >
+              <span className="table-id">+</span>
+              <div className="table-info">
+                <p>Add New Order</p>
+                <p>0.0 items</p>
+              </div>
+              <span className="process-status Open">Open</span>
             </div>
           </div>
         );
 
-      case 'Delivery':
+      case "Delivery":
         return (
           <div className="bottom-bar delivery">
             <div className="delivery-info">

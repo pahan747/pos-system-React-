@@ -31,11 +31,17 @@ const OrderSummary = ({ selectedTable }) => {
   const [amountEntered, setAmountEntered] = useState("0.00");
   const [discount, setDiscount] = useState("0");
   const [selectedCardType, setSelectedCardType] = useState(null);
-  const [filteredCartDetails, setFilteredCartDetails] = useState([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [orderNumber, setOrderNumber] = useState(generateOrderNumber());
+
+  function generateOrderNumber() {
+    const prefix = 'TO-';
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}${randomNum}`;
+  }
 
   const fetchCartDetails = useCallback(async () => {
-    if (!tableId || !selectedOrganizationId || !accessToken) {
+    if (!selectedOrganizationId || !accessToken) {
       setCartData(null);
       return;
     }
@@ -44,129 +50,123 @@ const OrderSummary = ({ selectedTable }) => {
     setCartError(null);
 
     try {
-      const response = await axios.get(
-        `${BASE_URL}Cart/get-cart-details?Guid=${tableId}&OrganizationsId=${selectedOrganizationId}`,
-        { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
-      );
+      let endpoint;
+      // Clear existing cart data before fetching new data
+      setCartData(null);
 
-      console.log("API Response:", response.data); // Debugging
+      switch (selectedServiceType) {
+        case "Take Away":
+          endpoint = `${BASE_URL}Cart/get-takeaway-cart-details?OrganizationsId=${selectedOrganizationId}`;
+          break;
+        case "Delivery":
+          endpoint = `${BASE_URL}Cart/get-delivery-cart-details?OrganizationsId=${selectedOrganizationId}`;
+          break;
+        case "Dine in":
+          if (!tableId) {
+            setCartError("Please select a table for dine-in orders");
+            setCartLoading(false);
+            return;
+          }
+          endpoint = `${BASE_URL}Cart/get-cart-details?Guid=${tableId}&OrganizationsId=${selectedOrganizationId}`;
+          break;
+        default:
+          setCartError("Invalid service type");
+          setCartLoading(false);
+          return;
+      }
 
+      const response = await axios.get(endpoint, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      // Validate the response data
+      if (!response.data || !response.data.cartDetails) {
+        setCartError("Invalid cart data received");
+        return;
+      }
+
+      // Add service type to cart data for validation
       setCartData({
         ...response.data,
-        cartDetails: response.data.cartDetails.map((item) => ({ ...item })),
+        serviceType: selectedServiceType
       });
     } catch (err) {
-      setCartError("Failed to fetch cart details");
       console.error("Fetch Error:", err);
+      setCartError("Failed to fetch cart details");
+      setCartData(null);
     } finally {
       setCartLoading(false);
     }
-  }, [tableId, selectedOrganizationId, accessToken, BASE_URL, setCartData, setCartLoading, setCartError]);
-
-  const filterCartDetails = useCallback(() => {
-    if (!cartData || !cartData.cartDetails) {
-      setFilteredCartDetails([]);
-      return;
-    }
-
-    const serviceTypeMap = {
-      "Dine in": 0,
-      "Take Away": 1,
-      "Delivery": 2,
-    };
-    const selectedType = serviceTypeMap[selectedServiceType];
-
-    // Check if cartData.type is an array or single value
-    const cartTypes = Array.isArray(cartData.type) ? cartData.type : [cartData.type];
-    const filtered = cartTypes.includes(selectedType) ? cartData.cartDetails : [];
-    
-    setFilteredCartDetails(filtered);
-  }, [cartData, selectedServiceType]);
+  }, [selectedServiceType, tableId, selectedOrganizationId, accessToken, BASE_URL, setCartData, setCartLoading, setCartError]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadCartDetails = async () => {
-      if (!isMounted) return;
+    const initializeCart = async () => {
       setIsTransitioning(true);
+      setCartData(null);
+      setCartError(null);
       await fetchCartDetails();
-      // Add a small delay before removing transition state
-      setTimeout(() => {
-        if (isMounted) {
-          setIsTransitioning(false);
-        }
-      }, 300);
-    };
-
-    loadCartDetails();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchCartDetails]);
-
-  useEffect(() => {
-    setIsTransitioning(true);
-    // Add a small delay before filtering to ensure smooth transition
-    const timer = setTimeout(() => {
-      filterCartDetails();
       setIsTransitioning(false);
-    }, 300);
+    };
 
-    return () => clearTimeout(timer);
-  }, [cartData, selectedServiceType, filterCartDetails]);
+    initializeCart();
+  }, [selectedServiceType, tableId, fetchCartDetails]);
 
   const handleServiceTypeChange = (service) => {
+    if (service === selectedServiceType) return; // Prevent unnecessary reloads
+
     setIsTransitioning(true);
     setSelectedServiceType(service);
+    setCartData(null); // Clear existing cart data
     setCartError(null);
+    
+    if (service !== 'Dine in') {
+      setOrderNumber(generateOrderNumber());
+    }
   };
 
   const handleNoteInputChange = (index, value) => {
-    const item = filteredCartDetails[index];
-    if (item.isKot !== 0) return;
+    if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
 
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
-      const itemIndex = prev.cartDetails.findIndex((i) => i.id === item.id);
-      newCartDetails[itemIndex].note = value;
+      newCartDetails[index].note = value;
       return { ...prev, cartDetails: newCartDetails };
     });
   };
 
   const handleQuantityIncrease = (index) => {
-    const item = filteredCartDetails[index];
-    if (item.isKot !== 0) return;
+    if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
 
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
-      const itemIndex = prev.cartDetails.findIndex((i) => i.id === item.id);
-      newCartDetails[itemIndex].qty += 1;
+      newCartDetails[index].qty += 1;
       return { ...prev, cartDetails: newCartDetails };
     });
   };
 
   const handleQuantityDecrease = (index) => {
-    const item = filteredCartDetails[index];
-    if (item.isKot !== 0 || item.qty <= 1) return;
+    if (!cartData?.cartDetails?.[index] || 
+        cartData.cartDetails[index].isKot !== 0 || 
+        cartData.cartDetails[index].qty <= 1) return;
 
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
-      const itemIndex = prev.cartDetails.findIndex((i) => i.id === item.id);
-      newCartDetails[itemIndex].qty -= 1;
+      newCartDetails[index].qty -= 1;
       return { ...prev, cartDetails: newCartDetails };
     });
   };
 
   const handleAddNoteToDatabase = async (index) => {
-    const item = filteredCartDetails[index];
-    if (item.isKot !== 0) return;
+    if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
 
-    const noteValue = item.note || "";
+    const noteValue = cartData.cartDetails[index].note || "";
     try {
       await axios.post(
         `${BASE_URL}Cart/add-note`,
-        { cartDetailId: item.id, note: noteValue },
+        { cartDetailId: cartData.cartDetails[index].id, note: noteValue },
         { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
       );
       await fetchCartDetails();
@@ -190,7 +190,7 @@ const OrderSummary = ({ selectedTable }) => {
       return;
     }
 
-    if (!filteredCartDetails.length) {
+    if (!cartData?.cartDetails.length) {
       message.warning("No items in cart to place order");
       return;
     }
@@ -215,7 +215,7 @@ const OrderSummary = ({ selectedTable }) => {
       return;
     }
 
-    if (!filteredCartDetails.length) {
+    if (!cartData?.cartDetails.length) {
       message.warning("No items in cart to finish order");
       return;
     }
@@ -228,7 +228,7 @@ const OrderSummary = ({ selectedTable }) => {
   const handlePaymentConfirm = async (method) => {
     try {
       const paymentTypeMap = { Cash: 0, Card: 1, QR: 2 };
-      const details = filteredCartDetails
+      const details = cartData.cartDetails
         .filter((item) => item.qty > 0 && item.price > 0)
         .map((item) => ({
           productId: item.productId || "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -278,7 +278,7 @@ const OrderSummary = ({ selectedTable }) => {
       if (response.status === 200 || response.status === 201) {
         message.success(`Payment successful via ${method}!`);
         setCartData(null);
-        setFilteredCartDetails([]);
+        setCartError(null);
         setShowCashModal(false);
         setShowCardModal(false);
         setShowQRModal(false);
@@ -316,39 +316,45 @@ const OrderSummary = ({ selectedTable }) => {
   const renderOrderContent = () => {
     if (cartLoading || isTransitioning) {
       return (
-        <div className="loading-state">
-          <i className="fas fa-spinner fa-spin"></i>
-          <p>Loading cart items...</p>
+        <div className="order-content-loading">
+          <div className="loading-spinner">
+            <i className="fas fa-spinner fa-spin"></i>
+          </div>
+          <div className="loading-text">
+            <p>Loading cart items...</p>
+            <p className="sub-text">Please wait while we fetch your order details</p>
+          </div>
         </div>
       );
     }
 
     if (cartError) {
       return (
-        <div className="error-state">
-          <i className="fas fa-exclamation-circle"></i>
-          <p>{cartError}</p>
-          <button 
-            className="retry-button"
-            onClick={fetchCartDetails}
-          >
-            <i className="fas fa-redo"></i> Retry
-          </button>
+        <div className="order-content-error">
+          <div className="error-icon">
+            <i className="fas fa-exclamation-circle"></i>
+          </div>
+          <div className="error-text">
+            <p>Something went wrong</p>
+            <p className="sub-text">{cartError}</p>
+          </div>
         </div>
       );
     }
 
-    if (!cartData) {
+    // Validate that cart data matches current service type
+    if (cartData?.serviceType !== selectedServiceType) {
+      setCartData(null);
+      fetchCartDetails();
       return (
-        <div className="no-items-state">
-          <i className="fas fa-shopping-cart"></i>
-          <p>No cart data available</p>
-          <p className="sub-text">Please select a table to view orders</p>
+        <div className="loading-state">
+          <i className="fas fa-spinner fa-spin"></i>
+          <p>Updating cart items...</p>
         </div>
       );
     }
 
-    if (filteredCartDetails.length === 0) {
+    if (!cartData?.cartDetails?.length) {
       return (
         <div className="no-items-state">
           <i className="fas fa-shopping-cart"></i>
@@ -358,7 +364,7 @@ const OrderSummary = ({ selectedTable }) => {
       );
     }
 
-    return filteredCartDetails.map((item, index) => (
+    return cartData.cartDetails.map((item, index) => (
       <div key={item.id || index} className="order-item">
         <img src={item.image} alt={item.name} />
         <div className="order-details">
@@ -404,13 +410,35 @@ const OrderSummary = ({ selectedTable }) => {
     ));
   };
 
+  const renderHeader = () => {
+    switch (selectedServiceType) {
+      case 'Dine in':
+        return (
+          <div className="table-header">
+            <h2>{tableName}</h2>
+            <p>Table Section</p>
+            <div className="edit-icon"><i className="fas fa-edit"></i></div>
+          </div>
+        );
+      case 'Take Away':
+      case 'Delivery':
+        return (
+          <div className="table-header">
+            <h2>{orderNumber}</h2>
+            <p>{selectedServiceType === 'Take Away' ? 'Order Section' : 'Delivery Section'}</p>
+            <div className="edit-icon">
+              <i className={`fas fa-${selectedServiceType === 'Take Away' ? 'shopping-bag' : 'motorcycle'}`}></i>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <aside className="order-summary">
-      <div className="table-header">
-        <h2>{tableName}</h2>
-        <p>Customer Section</p>
-        <div className="edit-icon"><i className="fas fa-edit"></i></div>
-      </div>
+      {renderHeader()}
       <div className="service-buttons">
         {["Dine in", "Take Away", "Delivery"].map((service) => (
           <button
@@ -427,7 +455,7 @@ const OrderSummary = ({ selectedTable }) => {
         {renderOrderContent()}
       </div>
 
-      {cartData && !cartLoading && filteredCartDetails.length > 0 && (
+      {cartData && !cartLoading && cartData.cartDetails.length > 0 && (
         <div className="totals">
           <p>SubTotal: <span>${(cartData.subTotal || 0).toFixed(2)}</span></p>
           <p>Tax: <span>${(cartData.tax || 0).toFixed(2)}</span></p>

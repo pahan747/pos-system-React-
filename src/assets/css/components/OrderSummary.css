@@ -20,9 +20,15 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.table-header h2 {
+.header-info {
+  flex: 1;
+}
+
+.header-info h2 {
   margin: 0;
   font-size: 26px;
   font-weight: 600;
@@ -30,8 +36,8 @@
   letter-spacing: 0.5px;
 }
 
-.table-header p {
-  margin: 0;
+.header-info p {
+  margin: 4px 0 0;
   font-size: 14px;
   color: #7f8c8d;
   font-weight: 400;
@@ -42,10 +48,65 @@
   color: #28a745;
   cursor: pointer;
   transition: color 0.3s ease;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: rgba(40, 167, 69, 0.1);
 }
 
 .table-header .edit-icon:hover {
-  color: #28a745;
+  color: #218838;
+  background-color: rgba(40, 167, 69, 0.2);
+}
+
+.takeaway-header .header-info h2 {
+  color: #52c41a;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  gap: 6px;
+}
+
+.status-badge.pickup {
+  background-color: rgba(82, 196, 26, 0.1);
+  color: #52c41a;
+}
+
+.status-badge.delivery {
+  background-color: rgba(114, 46, 209, 0.1);
+  color: #722ed1;
+}
+
+.status-badge i {
+  font-size: 16px;
+}
+
+.delivery-header .header-info h2 {
+  color: #722ed1;
+}
+
+.table-header {
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .service-buttons {
@@ -642,4 +703,76 @@
     width: 70px;
     height: 70px;
   }
+
+  .header-info h2 {
+    font-size: 22px;
+  }
+
+  .header-info p {
+    font-size: 12px;
+  }
+
+  .status-badge {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+.order-content-loading,
+.order-content-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  width: 100%;
+  padding: 20px;
+  text-align: center;
+  background: #fff;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.loading-spinner,
+.error-icon {
+  margin-bottom: 16px;
+}
+
+.loading-spinner i,
+.error-icon i {
+  font-size: 32px;
+  color: #1890ff;
+}
+
+.error-icon i {
+  color: #ff4d4f;
+}
+
+.loading-text,
+.error-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loading-text p,
+.error-text p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #262626;
+}
+
+.loading-text .sub-text,
+.error-text .sub-text {
+  font-size: 14px;
+  color: #8c8c8c;
+  font-weight: normal;
+}
+
+/* Ensure the loading state doesn't break the layout */
+.order-items.transitioning {
+  opacity: 0.7;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
