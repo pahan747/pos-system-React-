@@ -8,6 +8,7 @@ export const TakeAwayProvider = ({ children }) => {
   const [takeAwayOrders, setTakeAwayOrders] = useState([]);
   const [activeTakeAwayOrder, setActiveTakeAwayOrder] = useState(null);
   const [cartDetails, setCartDetails] = useState(null);
+  const [currentServiceType, setCurrentServiceType] = useState(null);
 
   const generateNextOrderNumber = () => {
     const nextCounter = orderCounter + 1;
@@ -44,8 +45,8 @@ export const TakeAwayProvider = ({ children }) => {
   };
 
   const handleTakeAwayOrderSelect = (order) => {
+    setCurrentServiceType('Take Away');
     setActiveTakeAwayOrder(order);
-    // Clear cart details when selecting a new order
     setCartDetails(null);
   };
 
@@ -56,6 +57,14 @@ export const TakeAwayProvider = ({ children }) => {
   const clearActiveOrder = () => {
     setActiveTakeAwayOrder(null);
     setCartDetails(null);
+    setCurrentServiceType(null);
+  };
+
+  const switchServiceType = (serviceType) => {
+    if (serviceType !== 'Take Away') {
+      clearActiveOrder();
+    }
+    setCurrentServiceType(serviceType);
   };
 
   return (
@@ -70,7 +79,9 @@ export const TakeAwayProvider = ({ children }) => {
       handleTakeAwayOrderSelect,
       cartDetails,
       updateCartDetails,
-      clearActiveOrder
+      clearActiveOrder,
+      currentServiceType,
+      switchServiceType
     }}>
       {children}
     </TakeAwayContext.Provider>

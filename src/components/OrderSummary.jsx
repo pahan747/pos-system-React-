@@ -18,18 +18,18 @@ const { Title, Text } = Typography;
 
 const OrderSummary = ({ selectedTable }) => {
   const { selectedOrganizationId } = useContext(OrganizationContext);
-  const { selectedTableId } = useContext(TableContext);
+  const { selectedTableId, setSelectedTableId } = useContext(TableContext);
   const { accessToken } = useContext(AuthContext);
   const { cartData, setCartData, cartLoading, setCartLoading, cartError, setCartError } = useCart();
-  const { selectedServiceType, setSelectedServiceType } = useServiceType();
   const { 
     activeTakeAwayOrder,
     cartDetails,
-    updateCartDetails
+    updateCartDetails,
+    clearActiveOrder,
+    switchServiceType
   } = useTakeAway();
+  const { selectedServiceType, setSelectedServiceType } = useServiceType();
   const BASE_URL = process.env.REACT_APP_API_URL;
-  const tableName = selectedTable ? selectedTable.name : "No table selected";
-  const tableId = selectedTable ? selectedTable.id : selectedTableId;
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [showCashModal, setShowCashModal] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
@@ -39,6 +39,7 @@ const OrderSummary = ({ selectedTable }) => {
   const [selectedCardType, setSelectedCardType] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [orderNumber, setOrderNumber] = useState(generateOrderNumber());
+  const [activeOrderType, setActiveOrderType] = useState(selectedServiceType);
 
   function generateOrderNumber() {
     const prefix = 'TO-';
@@ -52,8 +53,35 @@ const OrderSummary = ({ selectedTable }) => {
     }
   }, [cartDetails, selectedServiceType]);
 
+  const getOrderDetails = () => {
+    switch (selectedServiceType) {
+      case 'Take Away':
+        return {
+          id: activeTakeAwayOrder?.id,
+          name: activeTakeAwayOrder?.name,
+          type: 'Take Away'
+        };
+      case 'Dine in':
+        return {
+          id: selectedTable?.id,
+          name: selectedTable?.name,
+          type: 'Dine in'
+        };
+      case 'Delivery':
+        return {
+          id: null,
+          name: orderNumber,
+          type: 'Delivery'
+        };
+      default:
+        return null;
+    }
+  };
+
   const fetchCartDetails = useCallback(async () => {
+    console.log("Fetching cart details...");
     if (!selectedOrganizationId || !accessToken) {
+      console.log("Credentials missing, aborting fetch");
       setCartData(null);
       updateCartDetails(null);
       return;
@@ -62,25 +90,53 @@ const OrderSummary = ({ selectedTable }) => {
     setCartLoading(true);
     setCartError(null);
 
+    let endpoint;
+    let orderId;
+
     try {
-      let orderId;
       if (selectedServiceType === "Take Away") {
         if (!activeTakeAwayOrder?.id) {
+          console.log("No active take away order ID found");
+          setCartLoading(false);
           setCartData(null);
-          updateCartDetails(null);
           return;
         }
         orderId = activeTakeAwayOrder.id;
-      } else {
-        if (!selectedTableId) {
+      } else if (selectedServiceType === "Dine in") {
+        if (!selectedTable?.id) {
+          console.log("No selected table ID found");
+          setCartLoading(false);
           setCartData(null);
           return;
         }
-        orderId = selectedTableId;
+        orderId = selectedTable.id;
+      } else if (selectedServiceType === "Delivery") {
+        if (!orderNumber) {
+          console.log("No order number for delivery");
+          setCartLoading(false);
+          setCartData(null);
+          return;
+        }
+        
+        setCartLoading(false);
+        setCartData({
+          cartDetails: [],
+          subTotal: "0.00",
+          tax: "0.00",
+          service: "0.00",
+          serviceType: selectedServiceType
+        });
+        return;
+      } else {
+        console.log(`Unknown service type: ${selectedServiceType}`);
+        setCartLoading(false);
+        setCartData(null);
+        return;
       }
 
-      const endpoint = `${BASE_URL}Cart/get-cart-details?Guid=${orderId}&OrganizationsId=${selectedOrganizationId}`;
-      
+      endpoint = `${BASE_URL}Cart/get-cart-details?Guid=${orderId}&OrganizationsId=${selectedOrganizationId}`;
+      console.log(`Making API call to: ${endpoint}`);
+
       const response = await axios.get(endpoint, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -89,6 +145,7 @@ const OrderSummary = ({ selectedTable }) => {
       });
 
       if (!response.data || !response.data.cartDetails) {
+        console.log("API response invalid or missing cart details:", response.data);
         throw new Error("Invalid cart data received");
       }
 
@@ -97,52 +154,55 @@ const OrderSummary = ({ selectedTable }) => {
         serviceType: selectedServiceType
       };
 
+      console.log("Cart data fetched and processed:", newCartData);
+      setCartData(newCartData);
       if (selectedServiceType === "Take Away") {
         updateCartDetails(newCartData);
       }
-      setCartData(newCartData);
+
     } catch (err) {
-      console.error("Fetch Error:", err);
-      const errorMsg = err.response?.data?.message || err.message || "Failed to fetch cart details";
-      setCartError(errorMsg);
+      console.error("Error fetching cart details:", err);
+      setCartError(`Failed to fetch cart details: ${err.message}`);
       setCartData(null);
-      if (selectedServiceType === "Take Away") {
-        updateCartDetails(null);
-      }
     } finally {
       setCartLoading(false);
     }
-  }, [selectedTableId, activeTakeAwayOrder, selectedServiceType, accessToken, BASE_URL, selectedOrganizationId, setCartData, setCartLoading, setCartError, updateCartDetails]);
+  }, [selectedTable, activeTakeAwayOrder, selectedServiceType, accessToken, BASE_URL, selectedOrganizationId, updateCartDetails, orderNumber]);
 
   useEffect(() => {
-    const initializeCart = async () => {
-      setIsTransitioning(true);
-      setCartData(null);
-      setCartError(null);
-      await fetchCartDetails();
-      setIsTransitioning(false);
-    };
+    console.log("Effect to fetch cart details running...");
+    fetchCartDetails();
+  }, [fetchCartDetails]);
 
-    initializeCart();
-  }, [selectedServiceType, tableId, activeTakeAwayOrder, fetchCartDetails]);
+  useEffect(() => {
+    if (!isTransitioning) {
+      console.log("Service type changed, fetching cart details...");
+      fetchCartDetails();
+    }
+  }, [selectedServiceType, isTransitioning, fetchCartDetails]);
 
   const handleServiceTypeChange = (service) => {
     if (service === selectedServiceType) return;
 
+    // First, set the transition and reset cart states
     setIsTransitioning(true);
-    setSelectedServiceType(service);
-    
-    // Clear cart data
+    setCartLoading(true);
     setCartData(null);
     setCartError(null);
     
-    if (service === "Take Away") {
-      updateCartDetails(null);
-    }
+    // Update the service type globally
+    setSelectedServiceType(service);
+    switchServiceType(service);
     
     if (service === 'Delivery') {
       setOrderNumber(generateOrderNumber());
     }
+    
+    // Allow some time for the transition to complete before resetting states
+    setTimeout(() => {
+      setIsTransitioning(false);
+      // We'll let fetchCartDetails reset the loading state
+    }, 500); // Shorter timeout
   };
 
   const handleNoteInputChange = (index, value) => {
@@ -203,19 +263,20 @@ const OrderSummary = ({ selectedTable }) => {
   const calculateBalance = () => (parseFloat(amountEntered || "0.00") - parseFloat(calculateDiscountedTotal())).toFixed(2);
 
   const handlePlaceOrder = async () => {
-    if (!tableId || !selectedOrganizationId || !accessToken) {
+    const orderDetails = getOrderDetails();
+    if (!orderDetails?.id || !selectedOrganizationId || !accessToken) {
       message.error("Missing required information");
       return;
     }
 
-    if (!cartData?.cartDetails.length) {
+    if (!cartData?.cartDetails?.length) {
       message.warning("No items in cart to place order");
       return;
     }
 
     try {
       await axios.post(
-        `${BASE_URL}Cart/place-order?TableId=${tableId}`,
+        `${BASE_URL}Cart/place-order?TableId=${orderDetails.id}`,
         {},
         { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
       );
@@ -245,6 +306,11 @@ const OrderSummary = ({ selectedTable }) => {
 
   const handlePaymentConfirm = async (method) => {
     try {
+      const orderDetails = getOrderDetails();
+      if (!orderDetails?.id) {
+        throw new Error("No active order");
+      }
+
       const paymentTypeMap = { Cash: 0, Card: 1, QR: 2 };
       const details = cartData.cartDetails
         .filter((item) => item.qty > 0 && item.price > 0)
@@ -268,8 +334,8 @@ const OrderSummary = ({ selectedTable }) => {
 
       const orderData = {
         invoiceNumber: `INV-${Date.now()}`,
-        tableId: tableId || "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-        type: ["Dine in", "Take Away", "Delivery"].indexOf(selectedServiceType),
+        tableId: orderDetails.id,
+        type: ["Dine in", "Take Away", "Delivery"].indexOf(orderDetails.type),
         paymentType: paymentTypeMap[method],
         status: 0,
         dueDate: new Date().toISOString(),
@@ -308,11 +374,7 @@ const OrderSummary = ({ selectedTable }) => {
         throw new Error("Payment failed");
       }
     } catch (err) {
-      console.error("Payment error details:", {
-        response: err.response?.data,
-        status: err.response?.status,
-        message: err.message,
-      });
+      console.error("Payment error:", err);
       message.error("Failed to process payment. Please try again.");
     }
   };
@@ -331,13 +393,28 @@ const OrderSummary = ({ selectedTable }) => {
     }
   };
 
+  // Add this useEffect at the component level (outside any functions)
+  // Move this near your other useEffects
+  useEffect(() => {
+    // Safety timeout to prevent infinite loading states
+    let timer;
+    if (cartLoading || isTransitioning) {
+      timer = setTimeout(() => {
+        setCartLoading(false);
+        setIsTransitioning(false);
+      }, 3000);
+    }
+    return () => clearTimeout(timer);
+  }, [cartLoading, isTransitioning]);
+
   const renderOrderContent = () => {
     console.log('Cart Data:', cartData);
     console.log('Cart Loading:', cartLoading);
     console.log('Cart Error:', cartError);
     console.log('Active Take Away Order:', activeTakeAwayOrder);
+    console.log('Is Transitioning:', isTransitioning);
     
-    if (cartLoading || isTransitioning) {
+    if (cartLoading && isTransitioning) {
       return (
         <div className="order-content-loading">
           <div className="loading-spinner">
@@ -346,6 +423,35 @@ const OrderSummary = ({ selectedTable }) => {
           <div className="loading-text">
             <p>Loading cart items...</p>
             <p className="sub-text">Please wait while we fetch your order details</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Just loading without transition
+    if (cartLoading) {
+      return (
+        <div className="order-content-loading">
+          <div className="loading-spinner">
+            <i className="fa-spin fa-spinner fas"></i>
+          </div>
+          <div className="loading-text">
+            <p>Loading cart items...</p>
+            <p className="sub-text">Please wait while we fetch your order details</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Just transitioning without loading
+    if (isTransitioning) {
+      return (
+        <div className="order-content-loading">
+          <div className="loading-spinner">
+            <i className="fa-spin fa-spinner fas"></i>
+          </div>
+          <div className="loading-text">
+            <p>Switching service type...</p>
           </div>
         </div>
       );
@@ -365,14 +471,13 @@ const OrderSummary = ({ selectedTable }) => {
       );
     }
 
-    // Validate that cart data matches current service type
-    if (cartData?.serviceType !== selectedServiceType) {
-      setCartData(null);
-      fetchCartDetails();
+    if (!cartData || !cartData.cartDetails) {
+      console.log('Invalid cart data structure:', cartData);
       return (
-        <div className="loading-state">
-          <i className="fa-spin fa-spinner fas"></i>
-          <p>Updating cart items...</p>
+        <div className="no-items-state">
+          <i className="fa-shopping-cart fas"></i>
+          <p>No items in cart</p>
+          <p className="sub-text">Add some items to get started</p>
         </div>
       );
     }
@@ -434,25 +539,35 @@ const OrderSummary = ({ selectedTable }) => {
   };
 
   const renderHeader = () => {
-    switch (selectedServiceType) {
+    const currentOrderType = selectedServiceType;
+    
+    switch (currentOrderType) {
       case 'Dine in':
         return (
           <div className="table-header">
-            <h2>{tableId ? tableName : "No table selected"}</h2>
+            <h2>
+              {selectedTable ? selectedTable.name : "No table selected"}
+            </h2>
             <p>Table Section</p>
-            <div className="edit-icon"><i className="fa-edit fas"></i></div>
+            <div className="edit-icon">
+              <i className="fa-edit fas"></i>
+            </div>
           </div>
         );
+
       case 'Take Away':
         return (
           <div className="table-header">
-            <h2>{activeTakeAwayOrder ? activeTakeAwayOrder.name : "No order selected"}</h2>
+            <h2>
+              {activeTakeAwayOrder ? activeTakeAwayOrder.name : "No order selected"}
+            </h2>
             <p>Order Section</p>
             <div className="edit-icon">
               <i className="fa-shopping-bag fas"></i>
             </div>
           </div>
         );
+
       case 'Delivery':
         return (
           <div className="table-header">
@@ -463,6 +578,7 @@ const OrderSummary = ({ selectedTable }) => {
             </div>
           </div>
         );
+
       default:
         return null;
     }
@@ -524,7 +640,6 @@ const OrderSummary = ({ selectedTable }) => {
         Finish Order
       </button>
 
-      {/* Cash Payment Modal */}
       <PaymentModal
         title="Cash Payment"
         visible={showCashModal}
@@ -569,7 +684,6 @@ const OrderSummary = ({ selectedTable }) => {
         </Col>
       </PaymentModal>
 
-      {/* Card Payment Modal */}
       <PaymentModal
         title="Credit/Debit Card Payment"
         visible={showCardModal}
@@ -617,7 +731,6 @@ const OrderSummary = ({ selectedTable }) => {
         </Col>
       </PaymentModal>
 
-      {/* QR Payment Modal */}
       <PaymentModal
         title="QR Code Payment"
         visible={showQRModal}

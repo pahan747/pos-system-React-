@@ -100,7 +100,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
 
       const transformedOrders = response.data
         .map((order, index) => ({
-          id: order.id,
+          id: order.tableId,
           tableId: `TA ${index + 1}`,
           name: `Take Away ${index + 1}`,
           items: "0",
