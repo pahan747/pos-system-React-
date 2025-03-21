@@ -7,6 +7,7 @@ import { Input } from "antd";
 import TableOrderManager from "../components/TableOrderManager";
 import { CartProvider } from "../context/CartContext";
 import { ServiceTypeProvider } from "../context/ServiceTypeContext";
+import { TakeAwayProvider } from "../context/TakeAwayContext";
 
 const HomePageContent = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,7 +45,9 @@ const HomePage = () => {
   return (
     <CartProvider>
       <ServiceTypeProvider>
-        <HomePageContent />
+        <TakeAwayProvider>
+          <HomePageContent />
+        </TakeAwayProvider>
       </ServiceTypeProvider>
     </CartProvider>
   );
