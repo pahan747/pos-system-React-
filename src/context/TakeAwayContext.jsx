@@ -61,9 +61,14 @@ export const TakeAwayProvider = ({ children }) => {
   };
 
   const switchServiceType = (serviceType) => {
+    console.log("TakeAway context: switching to", serviceType);
+    
     if (serviceType !== 'Take Away') {
-      clearActiveOrder();
+      // Clear all Take Away specific data
+      setActiveTakeAwayOrder(null);
+      setCartDetails(null);
     }
+    
     setCurrentServiceType(serviceType);
   };
 

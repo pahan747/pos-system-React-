@@ -12,7 +12,7 @@ import PaymentKeypad from "./PaymentKeypad";
 import CardTypeSelector from "./CardTypeSelector";
 import PaymentModal from "./PaymentModal";
 import { Typography } from "antd";
-import { useServiceType } from '../context/ServiceTypeContext';
+import { useServiceType } from "../context/ServiceTypeContext";
 
 const { Title, Text } = Typography;
 
@@ -62,7 +62,7 @@ const CartItemsList = ({ cartData, onUpdateItem }) => {
             <button
               className="decrease qty-btn"
               disabled={item.qty <= 1 || item.isKot !== 0}
-              onClick={() => onUpdateItem(index, 'decrease')}
+              onClick={() => onUpdateItem(index, "decrease")}
             >
               -
             </button>
@@ -70,7 +70,7 @@ const CartItemsList = ({ cartData, onUpdateItem }) => {
             <button
               className="increase qty-btn"
               disabled={item.isKot !== 0}
-              onClick={() => onUpdateItem(index, 'increase')}
+              onClick={() => onUpdateItem(index, "increase")}
             >
               +
             </button>
@@ -80,13 +80,13 @@ const CartItemsList = ({ cartData, onUpdateItem }) => {
           <Input
             placeholder="Add notes"
             value={item.note || ""}
-            onChange={(e) => onUpdateItem(index, 'note', e.target.value)}
+            onChange={(e) => onUpdateItem(index, "note", e.target.value)}
             disabled={item.isKot !== 0}
             style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
           />
           <button
             className="add-note-btn"
-            onClick={() => onUpdateItem(index, 'addNote')}
+            onClick={() => onUpdateItem(index, "addNote")}
             disabled={item.isKot !== 0}
           >
             Add
@@ -102,12 +102,12 @@ const OrderSummary = ({ selectedTable }) => {
   const { selectedTableId, setSelectedTableId } = useContext(TableContext);
   const { accessToken } = useContext(AuthContext);
   const { cartData, setCartData, cartLoading, setCartLoading, cartError, setCartError } = useCart();
-  const { 
+  const {
     activeTakeAwayOrder,
     cartDetails,
     updateCartDetails,
     clearActiveOrder,
-    switchServiceType
+    switchServiceType,
   } = useTakeAway();
   const { selectedServiceType, setSelectedServiceType } = useServiceType();
   const BASE_URL = process.env.REACT_APP_API_URL;
@@ -123,153 +123,186 @@ const OrderSummary = ({ selectedTable }) => {
   const [activeOrderType, setActiveOrderType] = useState(selectedServiceType);
 
   function generateOrderNumber() {
-    const prefix = 'TO-';
+    const prefix = "TO-";
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}${randomNum}`;
   }
 
   const getOrderDetails = () => {
     switch (selectedServiceType) {
-      case 'Take Away':
+      case "Take Away":
         return {
           id: activeTakeAwayOrder?.id,
           name: activeTakeAwayOrder?.name,
-          type: 'Take Away'
+          type: "Take Away",
         };
-      case 'Dine in':
+      case "Dine in":
         return {
           id: selectedTable?.id,
           name: selectedTable?.name,
-          type: 'Dine in'
+          type: "Dine in",
         };
-      case 'Delivery':
+      case "Delivery":
         return {
           id: null,
           name: orderNumber,
-          type: 'Delivery'
+          type: "Delivery",
         };
       default:
         return null;
     }
   };
 
-  const fetchCartDetails = useCallback(async (skipLoading = false) => {
-    if (!selectedOrganizationId || !accessToken) {
-      console.log("Credentials missing, aborting fetch");
-      setCartData(null);
-      return;
-    }
+  const fetchCartDetails = useCallback(
+    async (skipLoading = false) => {
+      console.log("Fetching cart details for:", selectedServiceType);
 
-    if (!skipLoading) setCartLoading(true);
-    setCartError(null);
+      if (!selectedOrganizationId || !accessToken) {
+        console.log("Credentials missing, aborting fetch");
+        setCartData(null);
+        return;
+      }
 
-    try {
-      let cartData;
-      
-      switch (selectedServiceType) {
-        case "Take Away":
+      if (!skipLoading) setCartLoading(true);
+      setCartError(null);
+
+      try {
+        setCartData(null); // Clear existing cart data before fetching new data
+
+        if (selectedServiceType === "Take Away") {
           if (!activeTakeAwayOrder?.id) {
-            console.log("No active take away order");
-            setCartData(null);
+            console.log("No active take away order, skipping fetch");
+            setCartLoading(false);
             return;
           }
-          cartData = await fetchTakeAwayCart(activeTakeAwayOrder.id);
-          break;
-          
-        case "Dine in":
+
+          if (!cartDetails) {
+            const response = await axios.get(
+              `${BASE_URL}Cart/get-cart-details?Guid=${activeTakeAwayOrder.id}&OrganizationsId=${selectedOrganizationId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+
+            if (response.data && response.data.cartDetails) {
+              const newCartData = {
+                ...response.data,
+                serviceType: "Take Away",
+              };
+              setCartData(newCartData);
+              updateCartDetails(newCartData);
+            }
+          } else {
+            setCartData({
+              ...cartDetails,
+              serviceType: "Take Away",
+            });
+          }
+        } else if (selectedServiceType === "Dine in") {
           if (!selectedTable?.id) {
-            console.log("No table selected");
-            setCartData(null);
+            console.log("No table selected, skipping fetch");
+            setCartLoading(false);
             return;
           }
-          cartData = await fetchDineInCart(selectedTable.id);
-          break;
-          
-        case "Delivery":
-          cartData = createEmptyCart();
-          break;
-          
-        default:
-          console.log("Unknown service type");
-          setCartData(null);
-          return;
-      }
 
-      setCartData(cartData);
-      
-    } catch (error) {
-      console.error("Cart fetch error:", error);
-      setCartError("Failed to load cart data");
+          const response = await axios.get(
+            `${BASE_URL}Cart/get-cart-details?Guid=${selectedTable.id}&OrganizationsId=${selectedOrganizationId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (response.data && response.data.cartDetails) {
+            setCartData({
+              ...response.data,
+              serviceType: "Dine in",
+            });
+          }
+        } else if (selectedServiceType === "Delivery") {
+          setCartData({
+            cartDetails: [],
+            subTotal: "0.00",
+            tax: "0.00",
+            service: "0.00",
+            serviceType: "Delivery",
+          });
+        }
+      } catch (error) {
+        console.error("Cart fetch error:", error);
+        setCartError(`Failed to load cart data: ${error.message}`);
+        setCartData(null);
+      } finally {
+        setCartLoading(false);
+      }
+    },
+    [
+      selectedServiceType,
+      activeTakeAwayOrder,
+      selectedTable,
+      selectedOrganizationId,
+      accessToken,
+      cartDetails,
+      updateCartDetails,
+      BASE_URL,
+      setCartData,
+      setCartLoading,
+      setCartError,
+    ]
+  );
+
+  const handleServiceTypeChange = useCallback(
+    (service) => {
+      if (service === selectedServiceType) return;
+
+      console.log(`Switching service type from ${selectedServiceType} to ${service}`);
+
+      setIsTransitioning(true);
+      setCartError(null);
       setCartData(null);
-    } finally {
-      setCartLoading(false);
-    }
-  }, [selectedServiceType, activeTakeAwayOrder, selectedTable, selectedOrganizationId, accessToken]);
 
-  const fetchTakeAwayCart = async (orderId) => {
-    const response = await axios.get(
-      `${BASE_URL}Cart/get-cart-details?Guid=${orderId}&OrganizationsId=${selectedOrganizationId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
+      setSelectedServiceType(service);
+      switchServiceType(service);
+
+      if (service === "Take Away") {
+        if (!activeTakeAwayOrder) {
+          console.log("No active Take Away order");
+          setCartLoading(false);
         }
+      } else if (service === "Delivery") {
+        setOrderNumber(generateOrderNumber());
       }
-    );
-    
-    return {
-      ...response.data,
-      serviceType: "Take Away"
-    };
-  };
 
-  const fetchDineInCart = async (tableId) => {
-    const response = await axios.get(
-      `${BASE_URL}Cart/get-cart-details?Guid=${tableId}&OrganizationsId=${selectedOrganizationId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    
-    return {
-      ...response.data,
-      serviceType: "Dine in"
-    };
-  };
-
-  const createEmptyCart = () => ({
-    cartDetails: [],
-    subTotal: "0.00",
-    tax: "0.00",
-    service: "0.00",
-    serviceType: "Delivery"
-  });
-
-  const handleServiceTypeChange = useCallback((service) => {
-    if (service === selectedServiceType) return;
-
-    setIsTransitioning(true);
-    setSelectedServiceType(service);
-    switchServiceType(service);
-    
-    if (service === "Delivery") {
-      setOrderNumber(generateOrderNumber());
-    }
-
-    setTimeout(() => {
-      setIsTransitioning(false);
-      fetchCartDetails(true);
-    }, 300);
-  }, [selectedServiceType, switchServiceType, fetchCartDetails]);
+      setTimeout(() => {
+        setIsTransitioning(false);
+        fetchCartDetails(true);
+      }, 300);
+    },
+    [
+      selectedServiceType,
+      switchServiceType,
+      fetchCartDetails,
+      activeTakeAwayOrder,
+      generateOrderNumber,
+      setSelectedServiceType,
+      setCartError,
+      setCartData,
+      setCartLoading,
+      setOrderNumber,
+      setIsTransitioning,
+    ]
+  );
 
   useEffect(() => {
     if (!isTransitioning) {
       fetchCartDetails();
     }
-  }, [selectedServiceType, isTransitioning, fetchCartDetails]);
+  }, [fetchCartDetails, isTransitioning]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -281,7 +314,7 @@ const OrderSummary = ({ selectedTable }) => {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [cartLoading, isTransitioning]);
+  }, [cartLoading, isTransitioning, setCartLoading, setIsTransitioning]);
 
   const handleNoteInputChange = (index, value) => {
     if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
@@ -304,9 +337,12 @@ const OrderSummary = ({ selectedTable }) => {
   };
 
   const handleQuantityDecrease = (index) => {
-    if (!cartData?.cartDetails?.[index] || 
-        cartData.cartDetails[index].isKot !== 0 || 
-        cartData.cartDetails[index].qty <= 1) return;
+    if (
+      !cartData?.cartDetails?.[index] ||
+      cartData.cartDetails[index].isKot !== 0 ||
+      cartData.cartDetails[index].qty <= 1
+    )
+      return;
 
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
@@ -338,7 +374,8 @@ const OrderSummary = ({ selectedTable }) => {
     return (subTotal - subTotal * discountPercentage).toFixed(2);
   };
 
-  const calculateBalance = () => (parseFloat(amountEntered || "0.00") - parseFloat(calculateDiscountedTotal())).toFixed(2);
+  const calculateBalance = () =>
+    (parseFloat(amountEntered || "0.00") - parseFloat(calculateDiscountedTotal())).toFixed(2);
 
   const handlePlaceOrder = async () => {
     const orderDetails = getOrderDetails();
@@ -471,26 +508,35 @@ const OrderSummary = ({ selectedTable }) => {
     }
   };
 
-  const handleItemUpdate = useCallback((index, action, value) => {
-    if (!cartData?.cartDetails?.[index]) return;
-    
-    switch (action) {
-      case 'increase':
-        handleQuantityIncrease(index);
-        break;
-      case 'decrease':
-        handleQuantityDecrease(index);
-        break;
-      case 'note':
-        handleNoteInputChange(index, value);
-        break;
-      case 'addNote':
-        handleAddNoteToDatabase(index);
-        break;
-      default:
-        console.warn('Unknown update action:', action);
-    }
-  }, [cartData, handleQuantityIncrease, handleQuantityDecrease, handleNoteInputChange, handleAddNoteToDatabase]);
+  const handleItemUpdate = useCallback(
+    (index, action, value) => {
+      if (!cartData?.cartDetails?.[index]) return;
+
+      switch (action) {
+        case "increase":
+          handleQuantityIncrease(index);
+          break;
+        case "decrease":
+          handleQuantityDecrease(index);
+          break;
+        case "note":
+          handleNoteInputChange(index, value);
+          break;
+        case "addNote":
+          handleAddNoteToDatabase(index);
+          break;
+        default:
+          console.warn("Unknown update action:", action);
+      }
+    },
+    [
+      cartData,
+      handleQuantityIncrease,
+      handleQuantityDecrease,
+      handleNoteInputChange,
+      handleAddNoteToDatabase,
+    ]
+  );
 
   const renderOrderContent = () => {
     if (isTransitioning || cartLoading) {
@@ -510,14 +556,12 @@ const OrderSummary = ({ selectedTable }) => {
 
   const renderHeader = () => {
     const currentOrderType = selectedServiceType;
-    
+
     switch (currentOrderType) {
-      case 'Dine in':
+      case "Dine in":
         return (
           <div className="table-header">
-            <h2>
-              {selectedTable ? selectedTable.name : "No table selected"}
-            </h2>
+            <h2>{selectedTable ? selectedTable.name : "No table selected"}</h2>
             <p>Table Section</p>
             <div className="edit-icon">
               <i className="fa-edit fas"></i>
@@ -525,12 +569,10 @@ const OrderSummary = ({ selectedTable }) => {
           </div>
         );
 
-      case 'Take Away':
+      case "Take Away":
         return (
           <div className="table-header">
-            <h2>
-              {activeTakeAwayOrder ? activeTakeAwayOrder.name : "No order selected"}
-            </h2>
+            <h2>{activeTakeAwayOrder ? activeTakeAwayOrder.name : "No order selected"}</h2>
             <p>Order Section</p>
             <div className="edit-icon">
               <i className="fa-shopping-bag fas"></i>
@@ -538,7 +580,7 @@ const OrderSummary = ({ selectedTable }) => {
           </div>
         );
 
-      case 'Delivery':
+      case "Delivery":
         return (
           <div className="table-header">
             <h2>{orderNumber}</h2>
@@ -569,19 +611,29 @@ const OrderSummary = ({ selectedTable }) => {
         ))}
       </div>
 
-      <div className={`order-items ${isTransitioning ? 'transitioning' : ''}`}>
+      <div className={`order-items ${isTransitioning ? "transitioning" : ""}`}>
         {renderOrderContent()}
       </div>
 
       {cartData && !cartLoading && cartData.cartDetails.length > 0 && (
         <div className="totals">
-          <p>SubTotal: <span>${(cartData.subTotal || 0).toFixed(2)}</span></p>
-          <p>Tax: <span>${(cartData.tax || 0).toFixed(2)}</span></p>
-          <p>Service: <span>${(cartData.service || 0).toFixed(2)}</span></p>
+          <p>
+            SubTotal: <span>${(cartData.subTotal || 0).toFixed(2)}</span>
+          </p>
+          <p>
+            Tax: <span>${(cartData.tax || 0).toFixed(2)}</span>
+          </p>
+          <p>
+            Service: <span>${(cartData.service || 0).toFixed(2)}</span>
+          </p>
           {(cartData.discount || 0) > 0 && (
-            <p>Discount: <span>-${(cartData.discount || 0).toFixed(2)}</span></p>
+            <p>
+              Discount: <span>-${(cartData.discount || 0).toFixed(2)}</span>
+            </p>
           )}
-          <h3>Total: <span>${(cartData.subTotal || 0).toFixed(2)}</span></h3>
+          <h3>
+            Total: <span>${(cartData.subTotal || 0).toFixed(2)}</span>
+          </h3>
         </div>
       )}
 
@@ -631,7 +683,14 @@ const OrderSummary = ({ selectedTable }) => {
           />
         </Col>
         <Col span={12}>
-          <div style={{ background: "#fff", padding: "16px", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}>
+          <div
+            style={{
+              background: "#fff",
+              padding: "16px",
+              borderRadius: "8px",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+            }}
+          >
             <PaymentKeypad handleKeypadClick={handleKeypadClick} />
             <Button
               type="primary"
@@ -640,7 +699,7 @@ const OrderSummary = ({ selectedTable }) => {
                 height: "50px",
                 marginTop: "20px",
                 background: "#52c41a",
-                borderColor: "#52c41a",
+                borderColor: "#52arrison41a",
                 borderRadius: "6px",
                 fontSize: "16px",
                 fontWeight: "bold",
@@ -675,11 +734,21 @@ const OrderSummary = ({ selectedTable }) => {
           />
         </Col>
         <Col span={12}>
-          <div style={{ background: "#fff", padding: "16px", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}>
+          <div
+            style={{
+              background: "#fff",
+              padding: "16px",
+              borderRadius: "8px",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+            }}
+          >
             <Title level={4} style={{ color: "#52c41a", marginBottom: "16px" }}>
               Select Card Type
             </Title>
-            <CardTypeSelector selectedCardType={selectedCardType} setSelectedCardType={setSelectedCardType} />
+            <CardTypeSelector
+              selectedCardType={selectedCardType}
+              setSelectedCardType={setSelectedCardType}
+            />
             <Button
               type="primary"
               style={{
@@ -693,7 +762,9 @@ const OrderSummary = ({ selectedTable }) => {
                 fontWeight: "bold",
               }}
               onClick={() => handlePaymentConfirm("Card")}
-              disabled={parseFloat(amountEntered) < parseFloat(calculateDiscountedTotal()) || !selectedCardType}
+              disabled={
+                parseFloat(amountEntered) < parseFloat(calculateDiscountedTotal()) || !selectedCardType
+              }
             >
               Confirm Payment
             </Button>
@@ -721,7 +792,14 @@ const OrderSummary = ({ selectedTable }) => {
           />
         </Col>
         <Col span={12}>
-          <div style={{ background: "#fff", padding: "16px", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}>
+          <div
+            style={{
+              background: "#fff",
+              padding: "16px",
+              borderRadius: "8px",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+            }}
+          >
             <Title level={4} style={{ color: "#52c41a", marginBottom: "16px" }}>
               Scan QR Code
             </Title>
