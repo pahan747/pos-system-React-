@@ -16,6 +16,87 @@ import { useServiceType } from '../context/ServiceTypeContext';
 
 const { Title, Text } = Typography;
 
+const LoadingView = ({ isTransitioning }) => (
+  <div className="order-content-loading">
+    <div className="loading-spinner">
+      <i className="fa-spin fa-spinner fas"></i>
+    </div>
+    <div className="loading-text">
+      <p>{isTransitioning ? "Switching service type..." : "Loading cart items..."}</p>
+      {!isTransitioning && (
+        <p className="sub-text">Please wait while we fetch your order details</p>
+      )}
+    </div>
+  </div>
+);
+
+const ErrorView = ({ error }) => (
+  <div className="order-content-error">
+    <div className="error-icon">
+      <i className="fa-exclamation-circle fas"></i>
+    </div>
+    <div className="error-text">
+      <p>Something went wrong</p>
+      <p className="sub-text">{error}</p>
+    </div>
+  </div>
+);
+
+const EmptyCartView = ({ serviceType }) => (
+  <div className="no-items-state">
+    <i className="fa-shopping-cart fas"></i>
+    <p>No items in cart for {serviceType}</p>
+    <p className="sub-text">Add items to get started</p>
+  </div>
+);
+
+const CartItemsList = ({ cartData, onUpdateItem }) => {
+  return cartData.cartDetails.map((item, index) => (
+    <div key={item.id || index} className="order-item">
+      <img src={item.image} alt={item.name} />
+      <div className="order-details">
+        <h4>{item.name}</h4>
+        <div className="order-price">
+          <span>${(item.price || 0).toFixed(2)}</span>
+          <div className="quantity-controls">
+            <button
+              className="decrease qty-btn"
+              disabled={item.qty <= 1 || item.isKot !== 0}
+              onClick={() => onUpdateItem(index, 'decrease')}
+            >
+              -
+            </button>
+            <span>{item.qty}x</span>
+            <button
+              className="increase qty-btn"
+              disabled={item.isKot !== 0}
+              onClick={() => onUpdateItem(index, 'increase')}
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <div className="input-container">
+          <Input
+            placeholder="Add notes"
+            value={item.note || ""}
+            onChange={(e) => onUpdateItem(index, 'note', e.target.value)}
+            disabled={item.isKot !== 0}
+            style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
+          />
+          <button
+            className="add-note-btn"
+            onClick={() => onUpdateItem(index, 'addNote')}
+            disabled={item.isKot !== 0}
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  ));
+};
+
 const OrderSummary = ({ selectedTable }) => {
   const { selectedOrganizationId } = useContext(OrganizationContext);
   const { selectedTableId, setSelectedTableId } = useContext(TableContext);
@@ -47,12 +128,6 @@ const OrderSummary = ({ selectedTable }) => {
     return `${prefix}${randomNum}`;
   }
 
-  useEffect(() => {
-    if (selectedServiceType === "Take Away" && cartDetails) {
-      setCartData(cartDetails);
-    }
-  }, [cartDetails, selectedServiceType]);
-
   const getOrderDetails = () => {
     switch (selectedServiceType) {
       case 'Take Away':
@@ -78,132 +153,135 @@ const OrderSummary = ({ selectedTable }) => {
     }
   };
 
-  const fetchCartDetails = useCallback(async () => {
-    console.log("Fetching cart details...");
+  const fetchCartDetails = useCallback(async (skipLoading = false) => {
     if (!selectedOrganizationId || !accessToken) {
       console.log("Credentials missing, aborting fetch");
       setCartData(null);
-      updateCartDetails(null);
       return;
     }
 
-    setCartLoading(true);
+    if (!skipLoading) setCartLoading(true);
     setCartError(null);
 
-    let endpoint;
-    let orderId;
-
     try {
-      if (selectedServiceType === "Take Away") {
-        if (!activeTakeAwayOrder?.id) {
-          console.log("No active take away order ID found");
-          setCartLoading(false);
+      let cartData;
+      
+      switch (selectedServiceType) {
+        case "Take Away":
+          if (!activeTakeAwayOrder?.id) {
+            console.log("No active take away order");
+            setCartData(null);
+            return;
+          }
+          cartData = await fetchTakeAwayCart(activeTakeAwayOrder.id);
+          break;
+          
+        case "Dine in":
+          if (!selectedTable?.id) {
+            console.log("No table selected");
+            setCartData(null);
+            return;
+          }
+          cartData = await fetchDineInCart(selectedTable.id);
+          break;
+          
+        case "Delivery":
+          cartData = createEmptyCart();
+          break;
+          
+        default:
+          console.log("Unknown service type");
           setCartData(null);
           return;
-        }
-        orderId = activeTakeAwayOrder.id;
-      } else if (selectedServiceType === "Dine in") {
-        if (!selectedTable?.id) {
-          console.log("No selected table ID found");
-          setCartLoading(false);
-          setCartData(null);
-          return;
-        }
-        orderId = selectedTable.id;
-      } else if (selectedServiceType === "Delivery") {
-        if (!orderNumber) {
-          console.log("No order number for delivery");
-          setCartLoading(false);
-          setCartData(null);
-          return;
-        }
-        
-        setCartLoading(false);
-        setCartData({
-          cartDetails: [],
-          subTotal: "0.00",
-          tax: "0.00",
-          service: "0.00",
-          serviceType: selectedServiceType
-        });
-        return;
-      } else {
-        console.log(`Unknown service type: ${selectedServiceType}`);
-        setCartLoading(false);
-        setCartData(null);
-        return;
       }
 
-      endpoint = `${BASE_URL}Cart/get-cart-details?Guid=${orderId}&OrganizationsId=${selectedOrganizationId}`;
-      console.log(`Making API call to: ${endpoint}`);
-
-      const response = await axios.get(endpoint, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        }
-      });
-
-      if (!response.data || !response.data.cartDetails) {
-        console.log("API response invalid or missing cart details:", response.data);
-        throw new Error("Invalid cart data received");
-      }
-
-      const newCartData = {
-        ...response.data,
-        serviceType: selectedServiceType
-      };
-
-      console.log("Cart data fetched and processed:", newCartData);
-      setCartData(newCartData);
-      if (selectedServiceType === "Take Away") {
-        updateCartDetails(newCartData);
-      }
-
-    } catch (err) {
-      console.error("Error fetching cart details:", err);
-      setCartError(`Failed to fetch cart details: ${err.message}`);
+      setCartData(cartData);
+      
+    } catch (error) {
+      console.error("Cart fetch error:", error);
+      setCartError("Failed to load cart data");
       setCartData(null);
     } finally {
       setCartLoading(false);
     }
-  }, [selectedTable, activeTakeAwayOrder, selectedServiceType, accessToken, BASE_URL, selectedOrganizationId, updateCartDetails, orderNumber]);
+  }, [selectedServiceType, activeTakeAwayOrder, selectedTable, selectedOrganizationId, accessToken]);
 
-  useEffect(() => {
-    console.log("Effect to fetch cart details running...");
-    fetchCartDetails();
-  }, [fetchCartDetails]);
+  const fetchTakeAwayCart = async (orderId) => {
+    const response = await axios.get(
+      `${BASE_URL}Cart/get-cart-details?Guid=${orderId}&OrganizationsId=${selectedOrganizationId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    
+    return {
+      ...response.data,
+      serviceType: "Take Away"
+    };
+  };
+
+  const fetchDineInCart = async (tableId) => {
+    const response = await axios.get(
+      `${BASE_URL}Cart/get-cart-details?Guid=${tableId}&OrganizationsId=${selectedOrganizationId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    
+    return {
+      ...response.data,
+      serviceType: "Dine in"
+    };
+  };
+
+  const createEmptyCart = () => ({
+    cartDetails: [],
+    subTotal: "0.00",
+    tax: "0.00",
+    service: "0.00",
+    serviceType: "Delivery"
+  });
+
+  const handleServiceTypeChange = useCallback((service) => {
+    if (service === selectedServiceType) return;
+
+    setIsTransitioning(true);
+    setSelectedServiceType(service);
+    switchServiceType(service);
+    
+    if (service === "Delivery") {
+      setOrderNumber(generateOrderNumber());
+    }
+
+    setTimeout(() => {
+      setIsTransitioning(false);
+      fetchCartDetails(true);
+    }, 300);
+  }, [selectedServiceType, switchServiceType, fetchCartDetails]);
 
   useEffect(() => {
     if (!isTransitioning) {
-      console.log("Service type changed, fetching cart details...");
       fetchCartDetails();
     }
   }, [selectedServiceType, isTransitioning, fetchCartDetails]);
 
-  const handleServiceTypeChange = (service) => {
-    if (service === selectedServiceType) return;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (cartLoading || isTransitioning) {
+        console.log("Safety timeout triggered");
+        setCartLoading(false);
+        setIsTransitioning(false);
+      }
+    }, 5000);
 
-    // First, set the transition and reset cart states
-    setIsTransitioning(true);
-    setCartLoading(true);
-    setCartData(null);
-    setCartError(null);
-    
-    // Update the service type globally
-    setSelectedServiceType(service);
-    switchServiceType(service);
-    
-    if (service === 'Delivery') {
-      setOrderNumber(generateOrderNumber());
-    }
-    
-    // Allow some time for the transition to complete before resetting states
-    setTimeout(() => {
-      setIsTransitioning(false);
-      // We'll let fetchCartDetails reset the loading state
-    }, 500); // Shorter timeout
-  };
+    return () => clearTimeout(timer);
+  }, [cartLoading, isTransitioning]);
 
   const handleNoteInputChange = (index, value) => {
     if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
@@ -393,149 +471,41 @@ const OrderSummary = ({ selectedTable }) => {
     }
   };
 
-  // Add this useEffect at the component level (outside any functions)
-  // Move this near your other useEffects
-  useEffect(() => {
-    // Safety timeout to prevent infinite loading states
-    let timer;
-    if (cartLoading || isTransitioning) {
-      timer = setTimeout(() => {
-        setCartLoading(false);
-        setIsTransitioning(false);
-      }, 3000);
+  const handleItemUpdate = useCallback((index, action, value) => {
+    if (!cartData?.cartDetails?.[index]) return;
+    
+    switch (action) {
+      case 'increase':
+        handleQuantityIncrease(index);
+        break;
+      case 'decrease':
+        handleQuantityDecrease(index);
+        break;
+      case 'note':
+        handleNoteInputChange(index, value);
+        break;
+      case 'addNote':
+        handleAddNoteToDatabase(index);
+        break;
+      default:
+        console.warn('Unknown update action:', action);
     }
-    return () => clearTimeout(timer);
-  }, [cartLoading, isTransitioning]);
+  }, [cartData, handleQuantityIncrease, handleQuantityDecrease, handleNoteInputChange, handleAddNoteToDatabase]);
 
   const renderOrderContent = () => {
-    console.log('Cart Data:', cartData);
-    console.log('Cart Loading:', cartLoading);
-    console.log('Cart Error:', cartError);
-    console.log('Active Take Away Order:', activeTakeAwayOrder);
-    console.log('Is Transitioning:', isTransitioning);
-    
-    if (cartLoading && isTransitioning) {
-      return (
-        <div className="order-content-loading">
-          <div className="loading-spinner">
-            <i className="fa-spin fa-spinner fas"></i>
-          </div>
-          <div className="loading-text">
-            <p>Loading cart items...</p>
-            <p className="sub-text">Please wait while we fetch your order details</p>
-          </div>
-        </div>
-      );
-    }
-
-    // Just loading without transition
-    if (cartLoading) {
-      return (
-        <div className="order-content-loading">
-          <div className="loading-spinner">
-            <i className="fa-spin fa-spinner fas"></i>
-          </div>
-          <div className="loading-text">
-            <p>Loading cart items...</p>
-            <p className="sub-text">Please wait while we fetch your order details</p>
-          </div>
-        </div>
-      );
-    }
-
-    // Just transitioning without loading
-    if (isTransitioning) {
-      return (
-        <div className="order-content-loading">
-          <div className="loading-spinner">
-            <i className="fa-spin fa-spinner fas"></i>
-          </div>
-          <div className="loading-text">
-            <p>Switching service type...</p>
-          </div>
-        </div>
-      );
+    if (isTransitioning || cartLoading) {
+      return <LoadingView isTransitioning={isTransitioning} />;
     }
 
     if (cartError) {
-      return (
-        <div className="order-content-error">
-          <div className="error-icon">
-            <i className="fa-exclamation-circle fas"></i>
-          </div>
-          <div className="error-text">
-            <p>Something went wrong</p>
-            <p className="sub-text">{cartError}</p>
-          </div>
-        </div>
-      );
+      return <ErrorView error={cartError} />;
     }
 
-    if (!cartData || !cartData.cartDetails) {
-      console.log('Invalid cart data structure:', cartData);
-      return (
-        <div className="no-items-state">
-          <i className="fa-shopping-cart fas"></i>
-          <p>No items in cart</p>
-          <p className="sub-text">Add some items to get started</p>
-        </div>
-      );
+    if (!cartData?.cartDetails) {
+      return <EmptyCartView serviceType={selectedServiceType} />;
     }
 
-    if (!cartData?.cartDetails?.length) {
-      return (
-        <div className="no-items-state">
-          <i className="fa-shopping-cart fas"></i>
-          <p>No items in cart for {selectedServiceType}</p>
-          <p className="sub-text">Add items to get started</p>
-        </div>
-      );
-    }
-
-    return cartData.cartDetails.map((item, index) => (
-      <div key={item.id || index} className="order-item">
-        <img src={item.image} alt={item.name} />
-        <div className="order-details">
-          <h4>{item.name}</h4>
-          <div className="order-price">
-            <span>${(item.price || 0).toFixed(2)}</span>
-            <div className="quantity-controls">
-              <button
-                className="decrease qty-btn"
-                disabled={item.qty <= 1 || item.isKot !== 0}
-                onClick={() => handleQuantityDecrease(index)}
-              >
-                -
-              </button>
-              <span>{item.qty}x</span>
-              <button
-                className="increase qty-btn"
-                disabled={item.isKot !== 0}
-                onClick={() => handleQuantityIncrease(index)}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          <div className="input-container">
-            <Input
-              placeholder="Add notes"
-              value={item.note || ""}
-              onChange={(e) => handleNoteInputChange(index, e.target.value)}
-              disabled={item.isKot !== 0}
-              style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
-            />
-            <button
-              className="add-note-btn"
-              onClick={() => handleAddNoteToDatabase(index)}
-              disabled={item.isKot !== 0}
-            >
-              Add
-            </button>
-          </div>
-        </div>
-      </div>
-    ));
+    return <CartItemsList cartData={cartData} onUpdateItem={handleItemUpdate} />;
   };
 
   const renderHeader = () => {
