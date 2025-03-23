@@ -18,10 +18,14 @@ const TableOrderManager = ({ onRefetchTables }) => {
     }
   };
 
+  const handleClearTable = () => {
+    setSelectedTable(null); // Clear the selected table
+  };
+
   return (
     <div className="app-container">
       <div className="main-content">
-        <OrderSummary selectedTable={selectedTable} refetchTables={refetchTablesFn} />
+        <OrderSummary selectedTable={selectedTable} refetchTables={refetchTablesFn} onClearTable={handleClearTable} />
         <BottomBar onTableSelect={handleTableSelect} onRefetchTables={handleRefetchTables} />
       </div>
     </div>

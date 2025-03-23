@@ -16,88 +16,7 @@ import { useServiceType } from "../context/ServiceTypeContext";
 
 const { Title, Text } = Typography;
 
-const LoadingView = ({ isTransitioning }) => (
-  <div className="order-content-loading">
-    <div className="loading-spinner">
-      <i className="fa-spin fa-spinner fas"></i>
-    </div>
-    <div className="loading-text">
-      <p>{isTransitioning ? "Switching service type..." : "Loading cart items..."}</p>
-      {!isTransitioning && (
-        <p className="sub-text">Please wait while we fetch your order details</p>
-      )}
-    </div>
-  </div>
-);
-
-const ErrorView = ({ error }) => (
-  <div className="order-content-error">
-    <div className="error-icon">
-      <i className="fa-exclamation-circle fas"></i>
-    </div>
-    <div className="error-text">
-      <p>Something went wrong</p>
-      <p className="sub-text">{error}</p>
-    </div>
-  </div>
-);
-
-const EmptyCartView = ({ serviceType }) => (
-  <div className="no-items-state">
-    <i className="fa-shopping-cart fas"></i>
-    <p>No items in cart for {serviceType}</p>
-    <p className="sub-text">Add items to get started</p>
-  </div>
-);
-
-const CartItemsList = ({ cartData, onUpdateItem }) => {
-  return cartData.cartDetails.map((item, index) => (
-    <div key={item.id || index} className="order-item">
-      <img src={item.image} alt={item.name} />
-      <div className="order-details">
-        <h4>{item.name}</h4>
-        <div className="order-price">
-          <span>${(item.price || 0).toFixed(2)}</span>
-          <div className="quantity-controls">
-            <button
-              className="decrease qty-btn"
-              disabled={item.qty <= 1 || item.isKot !== 0}
-              onClick={() => onUpdateItem(index, "decrease")}
-            >
-              -
-            </button>
-            <span>{item.qty}x</span>
-            <button
-              className="increase qty-btn"
-              disabled={item.isKot !== 0}
-              onClick={() => onUpdateItem(index, "increase")}
-            >
-              +
-            </button>
-          </div>
-        </div>
-        <div className="input-container">
-          <Input
-            placeholder="Add notes"
-            value={item.note || ""}
-            onChange={(e) => onUpdateItem(index, "note", e.target.value)}
-            disabled={item.isKot !== 0}
-            style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
-          />
-          <button
-            className="add-note-btn"
-            onClick={() => onUpdateItem(index, "addNote")}
-            disabled={item.isKot !== 0}
-          >
-            Add
-          </button>
-        </div>
-      </div>
-    </div>
-  ));
-};
-
-const OrderSummary = ({ selectedTable }) => {
+const OrderSummary = ({ selectedTable, onClearTable }) => {
   const { selectedOrganizationId } = useContext(OrganizationContext);
   const { selectedTableId, setSelectedTableId } = useContext(TableContext);
   const { accessToken } = useContext(AuthContext);
@@ -195,8 +114,9 @@ const OrderSummary = ({ selectedTable }) => {
             if (selectedTable?.id) {
               console.log("Warning: selectedTable should be null for Take Away service");
               setSelectedTableId(null);
+              onClearTable();
             }
-            
+
             if (!activeTakeAwayOrder?.id) {
               console.log("No active Take Away order, skipping fetch");
               shouldFetch = false;
@@ -277,6 +197,7 @@ const OrderSummary = ({ selectedTable }) => {
       selectedOrganizationId,
       accessToken,
       cartDetails,
+      onClearTable,
       updateCartDetails,
       BASE_URL,
       setCartData,
@@ -289,15 +210,13 @@ const OrderSummary = ({ selectedTable }) => {
   const handleServiceTypeChange = useCallback(
     (service) => {
       if (service === selectedServiceType) return;
-
+  
       console.log(`Switching service type from ${selectedServiceType} to ${service}`);
-      console.log("Current selectedTable:", selectedTable?.id);
-      console.log("Current activeTakeAwayOrder:", activeTakeAwayOrder?.id);
-
       setIsTransitioning(true);
       setCartError(null);
-      setCartData(null);
-
+      setCartData(null); // Clear cart data immediately
+      console.log("Cart Data:", cartData);
+  
       // Clear selected table when switching to Take Away
       if (service === "Take Away") {
         console.log("Clearing selected table for Take Away service");
@@ -309,10 +228,11 @@ const OrderSummary = ({ selectedTable }) => {
       } else if (service === "Delivery") {
         setOrderNumber(generateOrderNumber());
       }
-
+  
       setSelectedServiceType(service);
       switchServiceType(service);
-
+  
+      // Fetch new cart data after a short delay to ensure state is updated
       setTimeout(() => {
         setIsTransitioning(false);
         fetchCartDetails(true);
@@ -334,13 +254,13 @@ const OrderSummary = ({ selectedTable }) => {
       setIsTransitioning,
     ]
   );
-
+  
   useEffect(() => {
-    if (!isTransitioning) {
+    if (!isTransitioning && selectedServiceType) {
       fetchCartDetails();
     }
-  }, [fetchCartDetails, isTransitioning]);
-
+  }, [fetchCartDetails, isTransitioning, selectedServiceType]);
+  
   useEffect(() => {
     const timer = setTimeout(() => {
       if (cartLoading || isTransitioning) {
@@ -349,7 +269,7 @@ const OrderSummary = ({ selectedTable }) => {
         setIsTransitioning(false);
       }
     }, 5000);
-
+  
     return () => clearTimeout(timer);
   }, [cartLoading, isTransitioning, setCartLoading, setIsTransitioning]);
 
@@ -876,6 +796,87 @@ const OrderSummary = ({ selectedTable }) => {
       </PaymentModal>
     </aside>
   );
+};
+
+const LoadingView = ({ isTransitioning }) => (
+  <div className="order-content-loading">
+    <div className="loading-spinner">
+      <i className="fa-spin fa-spinner fas"></i>
+    </div>
+    <div className="loading-text">
+      <p>{isTransitioning ? "Switching service type..." : "Loading cart items..."}</p>
+      {!isTransitioning && (
+        <p className="sub-text">Please wait while we fetch your order details</p>
+      )}
+    </div>
+  </div>
+);
+
+const ErrorView = ({ error }) => (
+  <div className="order-content-error">
+    <div className="error-icon">
+      <i className="fa-exclamation-circle fas"></i>
+    </div>
+    <div className="error-text">
+      <p>Something went wrong</p>
+      <p className="sub-text">{error}</p>
+    </div>
+  </div>
+);
+
+const EmptyCartView = ({ serviceType }) => (
+  <div className="no-items-state">
+    <i className="fa-shopping-cart fas"></i>
+    <p>No items in cart for {serviceType}</p>
+    <p className="sub-text">Add items to get started</p>
+  </div>
+);
+
+const CartItemsList = ({ cartData, onUpdateItem }) => {
+  return cartData.cartDetails.map((item, index) => (
+    <div key={item.id || index} className="order-item">
+      <img src={item.image} alt={item.name} />
+      <div className="order-details">
+        <h4>{item.name}</h4>
+        <div className="order-price">
+          <span>${(item.price || 0).toFixed(2)}</span>
+          <div className="quantity-controls">
+            <button
+              className="decrease qty-btn"
+              disabled={item.qty <= 1 || item.isKot !== 0}
+              onClick={() => onUpdateItem(index, "decrease")}
+            >
+              -
+            </button>
+            <span>{item.qty}x</span>
+            <button
+              className="increase qty-btn"
+              disabled={item.isKot !== 0}
+              onClick={() => onUpdateItem(index, "increase")}
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <div className="input-container">
+          <Input
+            placeholder="Add notes"
+            value={item.note || ""}
+            onChange={(e) => onUpdateItem(index, "note", e.target.value)}
+            disabled={item.isKot !== 0}
+            style={{ marginTop: "8px", width: "calc(100% - 80px)" }}
+          />
+          <button
+            className="add-note-btn"
+            onClick={() => onUpdateItem(index, "addNote")}
+            disabled={item.isKot !== 0}
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  ));
 };
 
 export default OrderSummary;
