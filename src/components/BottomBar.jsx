@@ -150,13 +150,21 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
 
   // Common functions
   const handleTableClick = (table) => {
-    setSelectedTableId(table.id);
-    onTableSelect(table);
+    console.log("Table/Order clicked:", {
+      id: table.id,
+      serviceType: selectedServiceType,
+      isTakeAway: selectedServiceType === "Take Away"
+    });
 
-    // Handle takeaway orders differently
     if (selectedServiceType === "Take Away") {
+      // For Take Away, only update Take Away context
       handleTakeAwayOrderSelect(table);
+      // Clear any selected table
+      setSelectedTableId(null);
     } else {
+      // For Dine in, update table context and clear Take Away
+      setSelectedTableId(table.id);
+      onTableSelect(table);
       clearActiveOrder();
     }
   };

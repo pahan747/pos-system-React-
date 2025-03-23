@@ -155,7 +155,10 @@ const OrderSummary = ({ selectedTable }) => {
 
   const fetchCartDetails = useCallback(
     async (skipLoading = false) => {
-      console.log("Fetching cart details for:", selectedServiceType);
+      console.log("=== Fetching Cart Details ===");
+      console.log("Service Type:", selectedServiceType);
+      console.log("Table ID:", selectedTable?.id);
+      console.log("Take Away Order ID:", activeTakeAwayOrder?.id);
 
       if (!selectedOrganizationId || !accessToken) {
         console.log("Credentials missing, aborting fetch");
@@ -169,69 +172,95 @@ const OrderSummary = ({ selectedTable }) => {
       try {
         setCartData(null); // Clear existing cart data before fetching new data
 
-        if (selectedServiceType === "Take Away") {
-          if (!activeTakeAwayOrder?.id) {
-            console.log("No active take away order, skipping fetch");
-            setCartLoading(false);
-            return;
-          }
+        let endpoint = "";
+        let params = {};
+        let shouldFetch = true;
 
-          if (!cartDetails) {
-            const response = await axios.get(
-              `${BASE_URL}Cart/get-cart-details?Guid=${activeTakeAwayOrder.id}&OrganizationsId=${selectedOrganizationId}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "Content-Type": "application/json",
-                },
-              }
-            );
+        switch (selectedServiceType) {
+          case "Dine in":
+            if (!selectedTable?.id) {
+              console.log("No table selected for Dine in, skipping fetch");
+              shouldFetch = false;
+              break;
+            }
+            endpoint = `${BASE_URL}Cart/get-cart-details`;
+            params = { 
+              Guid: selectedTable.id, 
+              OrganizationsId: selectedOrganizationId 
+            };
+            break;
 
-            if (response.data && response.data.cartDetails) {
-              const newCartData = {
-                ...response.data,
+          case "Take Away":
+            // Ensure selectedTable is null for Take Away
+            if (selectedTable?.id) {
+              console.log("Warning: selectedTable should be null for Take Away service");
+              setSelectedTableId(null);
+            }
+            
+            if (!activeTakeAwayOrder?.id) {
+              console.log("No active Take Away order, skipping fetch");
+              shouldFetch = false;
+              break;
+            }
+            if (cartDetails) {
+              console.log("Using cached Take Away cart details");
+              setCartData({
+                ...cartDetails,
                 serviceType: "Take Away",
-              };
-              setCartData(newCartData);
-              updateCartDetails(newCartData);
+              });
+              shouldFetch = false;
+              break;
             }
-          } else {
-            setCartData({
-              ...cartDetails,
-              serviceType: "Take Away",
-            });
-          }
-        } else if (selectedServiceType === "Dine in") {
-          if (!selectedTable?.id) {
-            console.log("No table selected, skipping fetch");
-            setCartLoading(false);
-            return;
-          }
+            endpoint = `${BASE_URL}Cart/get-cart-details`;
+            params = { 
+              Guid: activeTakeAwayOrder.id, 
+              OrganizationsId: selectedOrganizationId 
+            };
+            break;
 
-          const response = await axios.get(
-            `${BASE_URL}Cart/get-cart-details?Guid=${selectedTable.id}&OrganizationsId=${selectedOrganizationId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          if (response.data && response.data.cartDetails) {
+          case "Delivery":
+            console.log("Setting empty Delivery cart");
             setCartData({
-              ...response.data,
-              serviceType: "Dine in",
+              cartDetails: [],
+              subTotal: "0.00",
+              tax: "0.00",
+              service: "0.00",
+              serviceType: "Delivery",
             });
+            shouldFetch = false;
+            break;
+
+          default:
+            console.log("Invalid service type");
+            shouldFetch = false;
+            break;
+        }
+
+        if (!shouldFetch) {
+          setCartLoading(false);
+          return;
+        }
+
+        console.log(`Fetching ${selectedServiceType} cart with params:`, params);
+        const response = await axios.get(endpoint, {
+          params,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.data && response.data.cartDetails) {
+          const newCartData = {
+            ...response.data,
+            serviceType: selectedServiceType,
+          };
+          console.log(`Setting new cart data for: ${selectedServiceType}`);
+          setCartData(newCartData);
+
+          if (selectedServiceType === "Take Away") {
+            updateCartDetails(newCartData);
           }
-        } else if (selectedServiceType === "Delivery") {
-          setCartData({
-            cartDetails: [],
-            subTotal: "0.00",
-            tax: "0.00",
-            service: "0.00",
-            serviceType: "Delivery",
-          });
         }
       } catch (error) {
         console.error("Cart fetch error:", error);
@@ -253,6 +282,7 @@ const OrderSummary = ({ selectedTable }) => {
       setCartData,
       setCartLoading,
       setCartError,
+      setSelectedTableId,
     ]
   );
 
@@ -261,15 +291,17 @@ const OrderSummary = ({ selectedTable }) => {
       if (service === selectedServiceType) return;
 
       console.log(`Switching service type from ${selectedServiceType} to ${service}`);
+      console.log("Current selectedTable:", selectedTable?.id);
+      console.log("Current activeTakeAwayOrder:", activeTakeAwayOrder?.id);
 
       setIsTransitioning(true);
       setCartError(null);
       setCartData(null);
 
-      setSelectedServiceType(service);
-      switchServiceType(service);
-
+      // Clear selected table when switching to Take Away
       if (service === "Take Away") {
+        console.log("Clearing selected table for Take Away service");
+        setSelectedTableId(null);
         if (!activeTakeAwayOrder) {
           console.log("No active Take Away order");
           setCartLoading(false);
@@ -277,6 +309,9 @@ const OrderSummary = ({ selectedTable }) => {
       } else if (service === "Delivery") {
         setOrderNumber(generateOrderNumber());
       }
+
+      setSelectedServiceType(service);
+      switchServiceType(service);
 
       setTimeout(() => {
         setIsTransitioning(false);
@@ -288,6 +323,8 @@ const OrderSummary = ({ selectedTable }) => {
       switchServiceType,
       fetchCartDetails,
       activeTakeAwayOrder,
+      selectedTable,
+      setSelectedTableId,
       generateOrderNumber,
       setSelectedServiceType,
       setCartError,

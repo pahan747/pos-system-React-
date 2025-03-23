@@ -45,6 +45,7 @@ export const TakeAwayProvider = ({ children }) => {
   };
 
   const handleTakeAwayOrderSelect = (order) => {
+    console.log("Selecting Take Away order:", order.id);
     setCurrentServiceType('Take Away');
     setActiveTakeAwayOrder(order);
     setCartDetails(null);
@@ -55,6 +56,7 @@ export const TakeAwayProvider = ({ children }) => {
   };
 
   const clearActiveOrder = () => {
+    console.log("Clearing active takeaway order and cart details");
     setActiveTakeAwayOrder(null);
     setCartDetails(null);
     setCurrentServiceType(null);
@@ -65,8 +67,7 @@ export const TakeAwayProvider = ({ children }) => {
     
     if (serviceType !== 'Take Away') {
       // Clear all Take Away specific data
-      setActiveTakeAwayOrder(null);
-      setCartDetails(null);
+      clearActiveOrder();
     }
     
     setCurrentServiceType(serviceType);
