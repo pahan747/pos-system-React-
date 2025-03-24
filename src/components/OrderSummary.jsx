@@ -105,7 +105,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           case "Dine in":
             if (!selectedTable?.id) {
               console.log("No table selected for Dine in");
-              setCartData(null); // Explicitly set to null for empty state
+              setCartData(null);
               setCartLoading(false);
               return;
             }
@@ -120,13 +120,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           case "Take Away":
             if (!activeTakeAwayOrder?.id) {
               console.log("No active Take Away order");
-              setCartData({
-                cartDetails: [],
-                subTotal: "0.00",
-                tax: "0.00",
-                service: "0.00",
-                serviceType: "Take Away",
-              });
+              setCartData(null); // Set to null instead of empty cart
               setCartLoading(false);
               return;
             }
@@ -190,7 +184,6 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             updateCartDetails(newCartData);
           }
         } else {
-          // If no cart details returned, set empty state
           setCartData({
             cartDetails: [],
             subTotal: "0.00",
@@ -231,7 +224,6 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       setIsTransitioning(true);
       resetCartState();
 
-      // Cleanup previous service type state
       switch (selectedServiceType) {
         case "Dine in":
           setSelectedTableId(null);
@@ -247,21 +239,13 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           break;
       }
 
-      // Set new service type
       setSelectedServiceType(service);
       switchServiceType(service);
 
-      // Handle immediate state for new service type
       switch (service) {
         case "Take Away":
-          if (!activeTakeAwayOrder) {
-            setCartData({
-              cartDetails: [],
-              subTotal: "0.00",
-              tax: "0.00",
-              service: "0.00",
-              serviceType: "Take Away",
-            });
+          if (!activeTakeAwayOrder?.id) {
+            setCartData(null); // Set to null for no active order
             setIsTransitioning(false);
             setCartLoading(false);
             return;
@@ -281,7 +265,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           return;
         case "Dine in":
           if (!selectedTable?.id) {
-            setCartData(null); // Set null to trigger empty view
+            setCartData(null);
             setIsTransitioning(false);
             setCartLoading(false);
             return;
@@ -291,7 +275,6 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           break;
       }
 
-      // Fetch new data if needed
       Promise.resolve().then(() => {
         fetchCartDetails(true);
         setIsTransitioning(false);
@@ -322,19 +305,13 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     if (isTransitioning) return;
 
     if (selectedServiceType === "Dine in" && !selectedTable?.id) {
-      setCartData(null); // Ensure null state for no table
+      setCartData(null);
       setCartLoading(false);
       return;
     }
 
-    if (selectedServiceType === "Take Away" && !activeTakeAwayOrder) {
-      setCartData({
-        cartDetails: [],
-        subTotal: "0.00",
-        tax: "0.00",
-        service: "0.00",
-        serviceType: "Take Away",
-      });
+    if (selectedServiceType === "Take Away" && !activeTakeAwayOrder?.id) {
+      setCartData(null);
       setCartLoading(false);
       return;
     }
@@ -584,7 +561,14 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       return <ErrorView error={cartError} />;
     }
 
-    // Explicitly check for empty states
+    if (selectedServiceType === "Dine in" && !selectedTable?.id) {
+      return <NoTableSelectedView />;
+    }
+
+    if (selectedServiceType === "Take Away" && !activeTakeAwayOrder?.id) {
+      return <NoTakeAwayOrderSelectedView />;
+    }
+
     if (!cartData || (cartData && (!cartData.cartDetails || cartData.cartDetails.length === 0))) {
       return <EmptyCartView serviceType={selectedServiceType} />;
     }
@@ -908,6 +892,22 @@ const EmptyCartView = ({ serviceType }) => (
     <i className="fa-shopping-cart fas"></i>
     <p>No items in cart for {serviceType}</p>
     <p className="sub-text">Add items to get started</p>
+  </div>
+);
+
+const NoTableSelectedView = () => (
+  <div className="no-items-state">
+    <i className="fa-table fas"></i>
+    <p>No table selected</p>
+    <p className="sub-text">Table selected to get started</p>
+  </div>
+);
+
+const NoTakeAwayOrderSelectedView = () => (
+  <div className="no-items-state">
+    <i className="fa-shopping-bag fas"></i>
+    <p>No take away order selected</p>
+    <p className="sub-text">Take away order selected to get started</p>
   </div>
 );
 
