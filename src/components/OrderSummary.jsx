@@ -39,7 +39,6 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   const [selectedCardType, setSelectedCardType] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [orderNumber, setOrderNumber] = useState(generateOrderNumber());
-  const [activeOrderType, setActiveOrderType] = useState(selectedServiceType);
 
   function generateOrderNumber() {
     const prefix = "TO-";
@@ -72,8 +71,16 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     }
   };
 
+  const resetCartState = useCallback(() => {
+    setCartData(null);
+    setCartError(null);
+    setCartLoading(false);
+  }, [setCartData, setCartError, setCartLoading]);
+
   const fetchCartDetails = useCallback(
     async (skipLoading = false) => {
+      if (!selectedServiceType) return;
+
       console.log("=== Fetching Cart Details ===");
       console.log("Service Type:", selectedServiceType);
       console.log("Table ID:", selectedTable?.id);
@@ -81,46 +88,47 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
 
       if (!selectedOrganizationId || !accessToken) {
         console.log("Credentials missing, aborting fetch");
-        setCartData(null);
+        resetCartState();
         return;
       }
 
       if (!skipLoading) setCartLoading(true);
       setCartError(null);
+      setCartData(null);
 
       try {
-        setCartData(null); // Clear existing cart data before fetching new data
-
         let endpoint = "";
         let params = {};
-        let shouldFetch = true;
+        let shouldFetch = false;
 
         switch (selectedServiceType) {
           case "Dine in":
             if (!selectedTable?.id) {
-              console.log("No table selected for Dine in, skipping fetch");
-              shouldFetch = false;
-              break;
+              console.log("No table selected for Dine in");
+              setCartData(null); // Explicitly set to null for empty state
+              setCartLoading(false);
+              return;
             }
             endpoint = `${BASE_URL}Cart/get-cart-details`;
             params = { 
               Guid: selectedTable.id, 
               OrganizationsId: selectedOrganizationId 
             };
+            shouldFetch = true;
             break;
 
           case "Take Away":
-            // Ensure selectedTable is null for Take Away
-            if (selectedTable?.id) {
-              console.log("Warning: selectedTable should be null for Take Away service");
-              setSelectedTableId(null);
-              onClearTable();
-            }
-
             if (!activeTakeAwayOrder?.id) {
-              console.log("No active Take Away order, skipping fetch");
-              shouldFetch = false;
-              break;
+              console.log("No active Take Away order");
+              setCartData({
+                cartDetails: [],
+                subTotal: "0.00",
+                tax: "0.00",
+                service: "0.00",
+                serviceType: "Take Away",
+              });
+              setCartLoading(false);
+              return;
             }
             if (cartDetails) {
               console.log("Using cached Take Away cart details");
@@ -128,14 +136,15 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                 ...cartDetails,
                 serviceType: "Take Away",
               });
-              shouldFetch = false;
-              break;
+              setCartLoading(false);
+              return;
             }
             endpoint = `${BASE_URL}Cart/get-cart-details`;
             params = { 
               Guid: activeTakeAwayOrder.id, 
               OrganizationsId: selectedOrganizationId 
             };
+            shouldFetch = true;
             break;
 
           case "Delivery":
@@ -147,13 +156,14 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               service: "0.00",
               serviceType: "Delivery",
             });
-            shouldFetch = false;
-            break;
+            setCartLoading(false);
+            return;
 
           default:
             console.log("Invalid service type");
-            shouldFetch = false;
-            break;
+            setCartData(null);
+            setCartLoading(false);
+            return;
         }
 
         if (!shouldFetch) {
@@ -175,12 +185,19 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             ...response.data,
             serviceType: selectedServiceType,
           };
-          console.log(`Setting new cart data for: ${selectedServiceType}`);
           setCartData(newCartData);
-
           if (selectedServiceType === "Take Away") {
             updateCartDetails(newCartData);
           }
+        } else {
+          // If no cart details returned, set empty state
+          setCartData({
+            cartDetails: [],
+            subTotal: "0.00",
+            tax: "0.00",
+            service: "0.00",
+            serviceType: selectedServiceType,
+          });
         }
       } catch (error) {
         console.error("Cart fetch error:", error);
@@ -197,46 +214,88 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       selectedOrganizationId,
       accessToken,
       cartDetails,
-      onClearTable,
       updateCartDetails,
       BASE_URL,
       setCartData,
       setCartLoading,
       setCartError,
-      setSelectedTableId,
+      resetCartState,
     ]
   );
 
   const handleServiceTypeChange = useCallback(
     (service) => {
       if (service === selectedServiceType) return;
-  
+
       console.log(`Switching service type from ${selectedServiceType} to ${service}`);
       setIsTransitioning(true);
-      setCartError(null);
-      setCartData(null); // Clear cart data immediately
-      console.log("Cart Data:", cartData);
-  
-      // Clear selected table when switching to Take Away
-      if (service === "Take Away") {
-        console.log("Clearing selected table for Take Away service");
-        setSelectedTableId(null);
-        if (!activeTakeAwayOrder) {
-          console.log("No active Take Away order");
-          setCartLoading(false);
-        }
-      } else if (service === "Delivery") {
-        setOrderNumber(generateOrderNumber());
+      resetCartState();
+
+      // Cleanup previous service type state
+      switch (selectedServiceType) {
+        case "Dine in":
+          setSelectedTableId(null);
+          onClearTable();
+          break;
+        case "Take Away":
+          clearActiveOrder();
+          break;
+        case "Delivery":
+          setOrderNumber(generateOrderNumber());
+          break;
+        default:
+          break;
       }
-  
+
+      // Set new service type
       setSelectedServiceType(service);
       switchServiceType(service);
-  
-      // Fetch new cart data after a short delay to ensure state is updated
-      setTimeout(() => {
-        setIsTransitioning(false);
+
+      // Handle immediate state for new service type
+      switch (service) {
+        case "Take Away":
+          if (!activeTakeAwayOrder) {
+            setCartData({
+              cartDetails: [],
+              subTotal: "0.00",
+              tax: "0.00",
+              service: "0.00",
+              serviceType: "Take Away",
+            });
+            setIsTransitioning(false);
+            setCartLoading(false);
+            return;
+          }
+          break;
+        case "Delivery":
+          setCartData({
+            cartDetails: [],
+            subTotal: "0.00",
+            tax: "0.00",
+            service: "0.00",
+            serviceType: "Delivery",
+          });
+          setOrderNumber(generateOrderNumber());
+          setIsTransitioning(false);
+          setCartLoading(false);
+          return;
+        case "Dine in":
+          if (!selectedTable?.id) {
+            setCartData(null); // Set null to trigger empty view
+            setIsTransitioning(false);
+            setCartLoading(false);
+            return;
+          }
+          break;
+        default:
+          break;
+      }
+
+      // Fetch new data if needed
+      Promise.resolve().then(() => {
         fetchCartDetails(true);
-      }, 300);
+        setIsTransitioning(false);
+      });
     },
     [
       selectedServiceType,
@@ -245,22 +304,44 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       activeTakeAwayOrder,
       selectedTable,
       setSelectedTableId,
+      onClearTable,
       generateOrderNumber,
       setSelectedServiceType,
-      setCartError,
-      setCartData,
-      setCartLoading,
+      clearActiveOrder,
+      resetCartState,
       setOrderNumber,
-      setIsTransitioning,
     ]
   );
-  
+
   useEffect(() => {
-    if (!isTransitioning && selectedServiceType) {
-      fetchCartDetails();
+    if (!selectedServiceType) {
+      resetCartState();
+      return;
     }
-  }, [fetchCartDetails, isTransitioning, selectedServiceType]);
-  
+
+    if (isTransitioning) return;
+
+    if (selectedServiceType === "Dine in" && !selectedTable?.id) {
+      setCartData(null); // Ensure null state for no table
+      setCartLoading(false);
+      return;
+    }
+
+    if (selectedServiceType === "Take Away" && !activeTakeAwayOrder) {
+      setCartData({
+        cartDetails: [],
+        subTotal: "0.00",
+        tax: "0.00",
+        service: "0.00",
+        serviceType: "Take Away",
+      });
+      setCartLoading(false);
+      return;
+    }
+
+    fetchCartDetails();
+  }, [selectedServiceType, selectedTable, activeTakeAwayOrder, isTransitioning, fetchCartDetails, resetCartState]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (cartLoading || isTransitioning) {
@@ -269,9 +350,9 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         setIsTransitioning(false);
       }
     }, 5000);
-  
+
     return () => clearTimeout(timer);
-  }, [cartLoading, isTransitioning, setCartLoading, setIsTransitioning]);
+  }, [cartLoading, isTransitioning]);
 
   const handleNoteInputChange = (index, value) => {
     if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
@@ -433,8 +514,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
 
       if (response.status === 200 || response.status === 201) {
         message.success(`Payment successful via ${method}!`);
-        setCartData(null);
-        setCartError(null);
+        resetCartState();
         setShowCashModal(false);
         setShowCardModal(false);
         setShowQRModal(false);
@@ -504,7 +584,8 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       return <ErrorView error={cartError} />;
     }
 
-    if (!cartData?.cartDetails) {
+    // Explicitly check for empty states
+    if (!cartData || (cartData && (!cartData.cartDetails || cartData.cartDetails.length === 0))) {
       return <EmptyCartView serviceType={selectedServiceType} />;
     }
 
@@ -512,9 +593,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   };
 
   const renderHeader = () => {
-    const currentOrderType = selectedServiceType;
-
-    switch (currentOrderType) {
+    switch (selectedServiceType) {
       case "Dine in":
         return (
           <div className="table-header">
@@ -656,7 +735,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                 height: "50px",
                 marginTop: "20px",
                 background: "#52c41a",
-                borderColor: "#52arrison41a",
+                borderColor: "#52c41a",
                 borderRadius: "6px",
                 fontSize: "16px",
                 fontWeight: "bold",
