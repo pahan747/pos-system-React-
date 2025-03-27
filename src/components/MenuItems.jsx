@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
 import axios from "axios";
-import { message } from "antd"; // Import Ant Design message
+import { message } from "antd";
 
 // Contexts
 import { AuthContext } from "../context/AuthContext";
@@ -9,6 +9,7 @@ import { TableContext } from "../context/TableContext";
 import { useCart } from "../context/CartContext";
 import { useServiceType } from "../context/ServiceTypeContext";
 import { useTakeAway } from "../context/TakeAwayContext";
+import { useDelivery } from "../context/DeliveryContext"; // NEW: Added Delivery context
 
 // Constants
 const SERVICE_TYPE_MAP = {
@@ -36,23 +37,23 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
   const { setCartData, setCartLoading, setCartError } = useCart();
   const { selectedServiceType } = useServiceType();
   const { activeTakeAwayOrder } = useTakeAway();
+  const { activeDeliveryOrder } = useDelivery(); // NEW: Added Delivery context hook
 
   // API Configuration
-  const getApiConfig = useCallback(() => ({
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  }), [accessToken]);
+  const getApiConfig = useCallback(
+    () => ({
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    }),
+    [accessToken]
+  );
 
   // Fetch Menu Items
   useEffect(() => {
     const fetchMenuItems = async () => {
       try {
-        console.log("selectedServiceType:", selectedServiceType);
-        console.log("selectedTableId:", selectedTableId);
-        console.log("activeTakeAwayOrder:", activeTakeAwayOrder);
-
         if (!accessToken) {
           throw new Error("Access token missing. Please log in.");
         }
@@ -73,37 +74,40 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
     };
 
     fetchMenuItems();
-  }, [BASE_URL, accessToken, getApiConfig, selectedServiceType, selectedTableId, activeTakeAwayOrder]);
+  }, [BASE_URL, accessToken, getApiConfig]); // UPDATED: Removed unused dependencies
 
   // Cart Operations
-  const fetchCartDetails = useCallback(async () => {
-    if (!selectedTableId || !accessToken) {
-      console.log("fetchCartDetails skipped - selectedTableId:", selectedTableId);
-      return;
-    }
+  const fetchCartDetails = useCallback(
+    async (guid) => {
+      if (!guid || !accessToken) {
+        console.log("fetchCartDetails skipped - guid:", guid);
+        return;
+      }
 
-    setCartLoading(true);
-    setCartError(null);
+      setCartLoading(true);
+      setCartError(null);
 
-    try {
-      const response = await axios.get(
-        `${BASE_URL}Cart/get-cart-details?Guid=${selectedTableId}&OrganizationsId=${ORGANIZATION_ID}`,
-        getApiConfig()
-      );
+      try {
+        const response = await axios.get(
+          `${BASE_URL}Cart/get-cart-details?Guid=${guid}&OrganizationsId=${ORGANIZATION_ID}`,
+          getApiConfig()
+        );
 
-      setCartData(response.data);
-    } catch (err) {
-      setCartError("Failed to fetch cart details");
-      console.error("Error fetching cart:", err);
-    } finally {
-      setCartLoading(false);
-    }
-  }, [selectedTableId, accessToken, BASE_URL, setCartData, setCartLoading, setCartError, getApiConfig]);
+        setCartData(response.data);
+      } catch (err) {
+        setCartError("Failed to fetch cart details");
+        console.error("Error fetching cart:", err);
+      } finally {
+        setCartLoading(false);
+      }
+    },
+    [accessToken, BASE_URL, setCartData, setCartLoading, setCartError, getApiConfig]
+  ); // UPDATED: Made generic with guid parameter
 
   const addToDineInCart = async (product, orderType) => {
     if (!selectedTableId) {
-      message.error("Please select a table for dine-in orders"); // Ant Design error message
-      return; // Exit early
+      message.error("Please select a table for dine-in orders");
+      return;
     }
 
     const params = {
@@ -125,8 +129,8 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
 
   const addToTakeawayCart = async (product, orderType) => {
     if (!activeTakeAwayOrder) {
-      message.error("Please select an order for takeaway"); // Ant Design error message
-      return; // Exit early
+      message.error("Please select an order for takeaway");
+      return;
     }
     const params = {
       Guid: activeTakeAwayOrder?.id,
@@ -145,12 +149,40 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
     });
   };
 
+  const addToDeliveryCart = async (product, orderType) => { // NEW: Added Delivery cart function
+    if (!activeDeliveryOrder) {
+      message.error("Please select an order for delivery");
+      return;
+    }
+    const params = {
+      Guid: activeDeliveryOrder?.id,
+      ProductId: product.id,
+      Qty: 1,
+      cusId: CUSTOMER_ID,
+      name: product.name,
+      value: product.price,
+      ordertype: orderType,
+      OrganizationsId: ORGANIZATION_ID,
+    };
+
+    return axios.post(`${BASE_URL}Cart/add-to-cart`, null, {
+      params,
+      ...getApiConfig(),
+    });
+  };
+
   const handleAddToCart = async (product) => {
     const orderType = SERVICE_TYPE_MAP[selectedServiceType] ?? 0;
+    const guid =
+      selectedServiceType === "Dine in"
+        ? selectedTableId
+        : selectedServiceType === "Take Away"
+        ? activeTakeAwayOrder?.id
+        : activeDeliveryOrder?.id; // UPDATED: Added Delivery GUID selection
 
     console.log("handleAddToCart - selectedServiceType:", selectedServiceType);
-    console.log("handleAddToCart - selectedTableId:", selectedTableId);
     console.log("orderType:", orderType);
+    console.log("guid:", guid);
 
     try {
       setLoadingState((prev) => ({ ...prev, [product.id]: true }));
@@ -160,14 +192,19 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
         throw new Error("Access token missing. Please log in.");
       }
 
-      const addToCartFn = selectedServiceType === "Dine in" ? addToDineInCart : addToTakeawayCart;
+      const addToCartFn =
+        selectedServiceType === "Dine in"
+          ? addToDineInCart
+          : selectedServiceType === "Take Away"
+          ? addToTakeawayCart
+          : addToDeliveryCart; // UPDATED: Added Delivery function
 
       await addToCartFn(product, orderType);
 
       if (selectedServiceType === "Dine in") {
-        await Promise.all([fetchCartDetails(), refetchTables?.()]);
+        await Promise.all([fetchCartDetails(guid), refetchTables?.()]);
       } else {
-        await fetchCartDetails();
+        await fetchCartDetails(guid); // UPDATED: Use guid for all service types
       }
     } catch (err) {
       setDishError(err.message || "Failed to add item to dish");

@@ -4,6 +4,7 @@ import { AuthContext } from "../context/AuthContext";
 import { TableContext } from "../context/TableContext";
 import { useCart } from "../context/CartContext";
 import { useTakeAway } from "../context/TakeAwayContext";
+import { useDelivery } from "../context/DeliveryContext"; // Imported DeliveryContext to manage Delivery orders like Take Away
 import axios from "axios";
 import "../assets/css/components/OrderSummary.css";
 import { Button, Input, Col, message } from "antd";
@@ -26,8 +27,16 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     cartDetails,
     updateCartDetails,
     clearActiveOrder,
-    switchServiceType,
+    switchServiceType: switchTakeAwayServiceType,
   } = useTakeAway();
+  // Added DeliveryContext variables
+  const {
+    activeDeliveryOrder,
+    deliveryCartDetails,
+    updateDeliveryCartDetails,
+    clearActiveDeliveryOrder,
+    switchDeliveryServiceType,
+  } = useDelivery();
   const { selectedServiceType, setSelectedServiceType } = useServiceType();
   const BASE_URL = process.env.REACT_APP_API_URL;
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -38,13 +47,6 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   const [discount, setDiscount] = useState("0");
   const [selectedCardType, setSelectedCardType] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [orderNumber, setOrderNumber] = useState(generateOrderNumber());
-
-  function generateOrderNumber() {
-    const prefix = "TO-";
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    return `${prefix}${randomNum}`;
-  }
 
   const getOrderDetails = () => {
     switch (selectedServiceType) {
@@ -60,10 +62,11 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           name: selectedTable?.name,
           type: "Dine in",
         };
+      // Updated Delivery case to use activeDeliveryOrder
       case "Delivery":
         return {
-          id: null,
-          name: orderNumber,
+          id: activeDeliveryOrder?.id,
+          name: activeDeliveryOrder?.name || "No order selected",
           type: "Delivery",
         };
       default:
@@ -85,6 +88,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       console.log("Service Type:", selectedServiceType);
       console.log("Table ID:", selectedTable?.id);
       console.log("Take Away Order ID:", activeTakeAwayOrder?.id);
+      console.log("Delivery Order ID:", activeDeliveryOrder?.id);
 
       if (!selectedOrganizationId || !accessToken) {
         console.log("Credentials missing, aborting fetch");
@@ -141,17 +145,26 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             shouldFetch = true;
             break;
 
-          case "Delivery":
-            console.log("Setting empty Delivery cart");
-            setCartData({
-              cartDetails: [],
-              subTotal: "0.00",
-              tax: "0.00",
-              service: "0.00",
-              serviceType: "Delivery",
-            });
-            setCartLoading(false);
-            return;
+            case "Delivery":
+              if (!activeDeliveryOrder?.id) {
+                console.log("No active Delivery order");
+                setCartData(null);
+                setCartLoading(false);
+                return;
+              }
+              if (deliveryCartDetails) {
+                console.log("Using cached Delivery cart details");
+                setCartData({
+                  ...deliveryCartDetails,
+                  serviceType: "Delivery",
+                });
+                setCartLoading(false);
+                return;
+              }
+              endpoint = `${BASE_URL}Cart/get-cart-details`;
+              params = { Guid: activeDeliveryOrder.id, OrganizationsId: selectedOrganizationId };
+              shouldFetch = true;
+              break;
 
           default:
             console.log("Invalid service type");
@@ -182,6 +195,9 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           setCartData(newCartData);
           if (selectedServiceType === "Take Away") {
             updateCartDetails(newCartData);
+            // Cache fetched cart data in DeliveryContext for Delivery, like Take Away
+          } else if (selectedServiceType === "Delivery") {
+            updateDeliveryCartDetails(newCartData);
           }
         } else {
           setCartData({
@@ -203,11 +219,14 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     [
       selectedServiceType,
       activeTakeAwayOrder,
+      activeDeliveryOrder, 
       selectedTable,
       selectedOrganizationId,
       accessToken,
       cartDetails,
+      deliveryCartDetails, 
       updateCartDetails,
+      updateDeliveryCartDetails, 
       BASE_URL,
       setCartData,
       setCartLoading,
@@ -232,15 +251,17 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         case "Take Away":
           clearActiveOrder();
           break;
+        // Clear active Delivery order when switching away, like Take Away
         case "Delivery":
-          setOrderNumber(generateOrderNumber());
+          clearActiveDeliveryOrder();
           break;
         default:
           break;
       }
 
       setSelectedServiceType(service);
-      switchServiceType(service);
+      switchTakeAwayServiceType(service);
+      switchDeliveryServiceType(service); // Update DeliveryContext service type, like TakeAwayContext
 
       switch (service) {
         case "Take Away":
@@ -252,17 +273,13 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           }
           break;
         case "Delivery":
-          setCartData({
-            cartDetails: [],
-            subTotal: "0.00",
-            tax: "0.00",
-            service: "0.00",
-            serviceType: "Delivery",
-          });
-          setOrderNumber(generateOrderNumber());
-          setIsTransitioning(false);
-          setCartLoading(false);
-          return;
+          if (!activeDeliveryOrder?.id) {
+            setCartData(null);
+            setIsTransitioning(false);
+            setCartLoading(false);
+            return;
+          }
+          break;
         case "Dine in":
           if (!selectedTable?.id) {
             setCartData(null);
@@ -282,17 +299,18 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     },
     [
       selectedServiceType,
-      switchServiceType,
+      switchTakeAwayServiceType,
+      switchDeliveryServiceType, 
       fetchCartDetails,
       activeTakeAwayOrder,
+      activeDeliveryOrder, 
       selectedTable,
       setSelectedTableId,
       onClearTable,
-      generateOrderNumber,
       setSelectedServiceType,
       clearActiveOrder,
+      clearActiveDeliveryOrder, 
       resetCartState,
-      setOrderNumber,
     ]
   );
 
@@ -316,8 +334,15 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       return;
     }
 
+    // Added check for active Delivery order
+    if (selectedServiceType === "Delivery" && !activeDeliveryOrder?.id) {
+      setCartData(null);
+      setCartLoading(false);
+      return;
+    }
+
     fetchCartDetails();
-  }, [selectedServiceType, selectedTable, activeTakeAwayOrder, isTransitioning, fetchCartDetails, resetCartState]);
+  }, [selectedServiceType, selectedTable, activeTakeAwayOrder, activeDeliveryOrder, isTransitioning, fetchCartDetails, resetCartState]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -499,6 +524,12 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         setDiscount("0");
         setSelectedCardType(null);
         setSelectedPayment(null);
+        // Clear active Delivery order after payment, like Take Away
+        if (selectedServiceType === "Take Away") {
+          clearActiveOrder();
+        } else if (selectedServiceType === "Delivery") {
+          clearActiveDeliveryOrder();
+        }
       } else {
         throw new Error("Payment failed");
       }
@@ -568,6 +599,11 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     if (selectedServiceType === "Take Away" && !activeTakeAwayOrder?.id) {
       return <NoTakeAwayOrderSelectedView />;
     }
+    
+    // Added check for Delivery with a custom view, like Take Away
+    if (selectedServiceType === "Delivery" && !activeDeliveryOrder?.id) {
+      return <NoDeliveryOrderSelectedView />;
+    }
 
     if (!cartData || (cartData && (!cartData.cartDetails || cartData.cartDetails.length === 0))) {
       return <EmptyCartView serviceType={selectedServiceType} />;
@@ -603,7 +639,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       case "Delivery":
         return (
           <div className="table-header">
-            <h2>{orderNumber}</h2>
+            <h2>{activeDeliveryOrder ? activeDeliveryOrder.name : "No order selected"}</h2>
             <p>Delivery Section</p>
             <div className="edit-icon">
               <i className="fa-motorcycle fas"></i>
@@ -908,6 +944,14 @@ const NoTakeAwayOrderSelectedView = () => (
     <i className="fa-shopping-bag fas"></i>
     <p>No take away order selected</p>
     <p className="sub-text">Take away order selected to get started</p>
+  </div>
+);
+
+const NoDeliveryOrderSelectedView = () => (
+  <div className="no-items-state">
+    <i className="fa-motorcycle fas"></i>
+    <p>No delivery order selected</p>
+    <p className="sub-text">Delivery order selected to get started</p>
   </div>
 );
 

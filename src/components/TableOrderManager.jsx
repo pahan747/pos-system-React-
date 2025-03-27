@@ -2,31 +2,45 @@
 import React, { useState } from "react";
 import OrderSummary from "./OrderSummary";
 import BottomBar from "./BottomBar";
+import OtherServicesModal from "./OtherServicesModal";
 
 const TableOrderManager = ({ onRefetchTables }) => {
   const [selectedTable, setSelectedTable] = useState(null);
   const [refetchTablesFn, setRefetchTablesFn] = useState(null);
+  const [isOtherServicesModalVisible, setIsOtherServicesModalVisible] = useState(false);
 
   const handleTableSelect = (table) => {
     setSelectedTable(table);
   };
 
   const handleRefetchTables = (fetchFn) => {
-    setRefetchTablesFn(() => fetchFn); // Store the fetchTables function
+    setRefetchTablesFn(() => fetchFn);
     if (onRefetchTables) {
-      onRefetchTables(fetchFn); // Pass it up to HomePage if needed
+      onRefetchTables(fetchFn);
     }
   };
 
   const handleClearTable = () => {
-    setSelectedTable(null); // Clear the selected table
+    setSelectedTable(null);
   };
 
   return (
     <div className="app-container">
       <div className="main-content">
-        <OrderSummary selectedTable={selectedTable} refetchTables={refetchTablesFn} onClearTable={handleClearTable} />
-        <BottomBar onTableSelect={handleTableSelect} onRefetchTables={handleRefetchTables} />
+        <OrderSummary 
+          selectedTable={selectedTable} 
+          refetchTables={refetchTablesFn} 
+          onClearTable={handleClearTable}
+        />
+        <BottomBar 
+          onTableSelect={handleTableSelect} 
+          onRefetchTables={handleRefetchTables}
+          onOtherServicesClick={() => setIsOtherServicesModalVisible(true)}
+        />
+        <OtherServicesModal 
+          visible={isOtherServicesModalVisible}
+          onClose={() => setIsOtherServicesModalVisible(false)}
+        />
       </div>
     </div>
   );

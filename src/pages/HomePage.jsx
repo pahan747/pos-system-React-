@@ -8,6 +8,7 @@ import TableOrderManager from "../components/TableOrderManager";
 import { CartProvider } from "../context/CartContext";
 import { ServiceTypeProvider } from "../context/ServiceTypeContext";
 import { TakeAwayProvider } from "../context/TakeAwayContext";
+import { DeliveryProvider } from "../context/DeliveryContext";
 
 const HomePageContent = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,7 +47,9 @@ const HomePage = () => {
     <CartProvider>
       <ServiceTypeProvider>
         <TakeAwayProvider>
-          <HomePageContent />
+          <DeliveryProvider>
+            <HomePageContent />
+          </DeliveryProvider>
         </TakeAwayProvider>
       </ServiceTypeProvider>
     </CartProvider>

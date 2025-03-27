@@ -7,6 +7,7 @@ import { TableContext } from "../context/TableContext";
 import { useServiceType } from "../context/ServiceTypeContext";
 import { useTakeAway } from "../context/TakeAwayContext";
 import { message } from "antd";
+import { useDelivery } from "../context/DeliveryContext";
 
 const SERVICE_TYPE_MAP = {
   "Dine in": 0,
@@ -20,6 +21,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   const { setSelectedTableId } = useContext(TableContext);
   const { selectedServiceType } = useServiceType();
   const { addTakeAwayOrder, handleTakeAwayOrderSelect, clearActiveOrder } = useTakeAway();
+  const { addDeliveryOrder, handleDeliveryOrderSelect, clearActiveDeliveryOrder } = useDelivery(); 
   const BASE_URL = process.env.REACT_APP_API_URL;
   const organizationId = "1e7071f0-dacb-4a98-f264-08dcb066d923";
 
@@ -31,6 +33,10 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   // Take-away specific state
   const [takeawayOrders, setTakeawayOrders] = useState([]);
   const [takeawayLoading, setTakeawayLoading] = useState(false);
+
+  // Delivery specific state
+  const [deliveryOrders, setDeliveryOrders] = useState([]); 
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
 
   // Dine-in specific functions
   const fetchTables = useCallback(async () => {
@@ -148,24 +154,74 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     }
   };
 
+  // Delivery specific functions
+  const fetchDeliveryOrders = useCallback(async () => {
+    try {
+      if (!accessToken) throw new Error("Access token missing. Please log in.");
+      setDeliveryLoading(true);
+
+      const config = { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } };
+      const response = await axios.get(`${BASE_URL}Cart/get-delivery-orders?OrganizationsId=${organizationId}`, config);
+
+      const transformedOrders = response.data
+        .map((order, index) => ({
+          id: order.tableId,
+          tableId: `DL ${index + 1}`,
+          name: `Delivery ${index + 1}`,
+          items: "0",
+          status: "Open",
+          createUtc: order.createUtc,
+        }))
+        .sort((a, b) => new Date(a.createUtc) - new Date(b.createUtc));
+
+      setDeliveryOrders(transformedOrders); // Local state
+    } catch (err) {
+      console.error("Error fetching delivery orders:", err);
+      message.error(err.response?.data?.message || "Failed to load delivery orders");
+    } finally {
+      setDeliveryLoading(false);
+    }
+  }, [accessToken, BASE_URL, organizationId]);
+
+  const handleAddDeliveryOrder = async () => {
+    try {
+      const newOrder = addDeliveryOrder(); // Still use context to generate order
+      await axios.post(
+        `${BASE_URL}Cart/add-delivery-order?tableId=${newOrder.id}&customerId=80ebf3b0-a2d7-49d2-6a06-08dcda15281e&orderType=2`,
+        null,
+        { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
+      );
+      handleTableClick(newOrder);
+      message.success("New delivery order created successfully!");
+      await fetchDeliveryOrders();
+    } catch (err) {
+      console.error("Error initializing delivery cart:", err);
+      message.error(err.response?.data?.message || "Failed to create new delivery order");
+    }
+  };
+
   // Common functions
   const handleTableClick = (table) => {
     console.log("Table/Order clicked:", {
-      id: table.id,
+      id: table,
       serviceType: selectedServiceType,
-      isTakeAway: selectedServiceType === "Take Away"
+      isTakeAway: selectedServiceType === "Take Away",
+      isDelivery: selectedServiceType === "Delivery",
     });
 
     if (selectedServiceType === "Take Away") {
-      // For Take Away, only update Take Away context
       handleTakeAwayOrderSelect(table);
-      // Clear any selected table
       setSelectedTableId(null);
+      clearActiveDeliveryOrder();
+    } else if (selectedServiceType === "Delivery") {
+      handleDeliveryOrderSelect(table);
+      setSelectedTableId(null);
+      clearActiveOrder();
     } else {
-      // For Dine in, update table context and clear Take Away
       setSelectedTableId(table.id);
       onTableSelect(table);
       clearActiveOrder();
+      clearActiveDeliveryOrder();
     }
   };
 
@@ -248,20 +304,43 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     );
   };
 
-  const renderDeliverySection = () => (
-    <div className="bottom-bar delivery">
-      <div className="delivery-info">
-        <i className="fa-motorcycle fas"></i>
-        <span>Delivery Status</span>
+  const renderDeliverySection = () => {
+    if (deliveryLoading) return renderLoadingState();
+
+    return (
+      <div className="bottom-bar">
+        {deliveryOrders.map((order) => (
+          <div
+            key={order.id}
+            className="table-status"
+            onClick={() => handleTableClick(order)}
+            style={{ cursor: "pointer" }}
+          >
+            <span className="table-id">{order.tableId}</span>
+            <div className="table-info">
+              <p>{order.name}</p>
+              <p>{order.items}.0 items</p>
+            </div>
+            <span className={`process-status ${order.status}`}>
+              {order.status}
+            </span>
+          </div>
+        ))}
+        <div
+          className="table-status add-new"
+          onClick={handleAddDeliveryOrder}
+          style={{ cursor: "pointer" }}
+        >
+          <span className="table-id">+</span>
+          <div className="table-info">
+            <p>Add New Delivery</p>
+            <p>0.0 orders</p>
+          </div>
+          <span className="Open process-status">Open</span>
+        </div>
       </div>
-      <div className="actions">
-        <button className="track-delivery">
-          <i className="fa-map-marker-alt fas"></i>
-          Track Delivery
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Effects
   useEffect(() => {
@@ -288,8 +367,10 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   useEffect(() => {
     if (selectedServiceType === "Take Away") {
       fetchTakeawayOrders();
+    } else if (selectedServiceType === "Delivery") {
+      fetchDeliveryOrders();
     }
-  }, [selectedServiceType, fetchTakeawayOrders]);
+  }, [selectedServiceType, fetchTakeawayOrders, fetchDeliveryOrders]);
 
   // Main render
   const renderBottomBar = () => {
