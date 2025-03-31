@@ -1,16 +1,11 @@
-// src/components/HomePage.js
 import React, { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Menu from "../components/Menu";
 import OrganizationDropdown from "../components/OrganizationDropdown";
 import { Input } from "antd";
 import TableOrderManager from "../components/TableOrderManager";
-import { CartProvider } from "../context/CartContext";
-import { ServiceTypeProvider } from "../context/ServiceTypeContext";
-import { TakeAwayProvider } from "../context/TakeAwayContext";
-import { DeliveryProvider } from "../context/DeliveryContext";
 
-const HomePageContent = () => {
+const HomePage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [refetchTablesFn, setRefetchTablesFn] = useState(null);
 
@@ -39,20 +34,6 @@ const HomePageContent = () => {
       </main>
       <TableOrderManager onRefetchTables={handleRefetchTables} />
     </div>
-  );
-};
-
-const HomePage = () => {
-  return (
-    <CartProvider>
-      <ServiceTypeProvider>
-        <TakeAwayProvider>
-          <DeliveryProvider>
-            <HomePageContent />
-          </DeliveryProvider>
-        </TakeAwayProvider>
-      </ServiceTypeProvider>
-    </CartProvider>
   );
 };
 

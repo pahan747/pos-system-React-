@@ -15,6 +15,7 @@ import PaymentModal from "./PaymentModal";
 import { Typography } from "antd";
 import { useServiceType } from "../context/ServiceTypeContext";
 import CustomerCreationModal from "./CustomerCreationModal";
+import { useCustomer } from "../context/CustomerContext";
 
 const { Title, Text } = Typography;
 
@@ -56,6 +57,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   const [selectedCardType, setSelectedCardType] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
+  const { selectedCustomer } = useCustomer();
 
   const handleCustomerIconClick = () => {
     setIsCustomerModalVisible(true);
@@ -560,7 +562,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         subTotal: subTotal,
         serviceCharge: parseFloat(cartData?.service || "0.00"),
         paidAmount: parseFloat(amountEntered),
-        customerID: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        customerID: selectedCustomer?.id,
         organizationId: selectedOrganizationId,
         details: details,
       };
@@ -684,43 +686,114 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     switch (selectedServiceType) {
       case "Dine in":
         return (
-          <div className="table-header">
-            <h2>{selectedTable ? selectedTable.name : "No table selected"}</h2>
-            <p>Table Section</p>
-            <div className="edit-icon">
-              <i className="fa-edit fas" onClick={handleCustomerIconClick}></i>
+          <>
+            <div className="table-header">
+              <h2>
+                {selectedTable ? selectedTable.name : "No table selected"}
+              </h2>
+              <p>Table Section</p>
+              <div className="edit-icon" onClick={handleCustomerIconClick}>
+                <i
+                  className="fa-edit fas"
+                  onClick={handleCustomerIconClick}
+                ></i>
+              </div>
             </div>
-          </div>
+            <div
+              style={{
+                borderBottom: "1px solid #e8e8e8",
+                marginBottom: "15px",
+                paddingBottom: "10px",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "15px",
+                  color: "#8c8c8c",
+                  margin: "0",
+                  fontWeight: "400",
+                }}
+              >
+                Customer : {selectedCustomer?.name || "No customer selected"}
+              </p>
+            </div>
+          </>
         );
 
       case "Take Away":
         return (
-          <div className="table-header">
-            <h2>
-              {activeTakeAwayOrder
-                ? activeTakeAwayOrder.name
-                : "No order selected"}
-            </h2>
-            <p>Order Section</p>
-            <div className="edit-icon">
-              <i className="fa-shopping-bag fas" onClick={handleCustomerIconClick}></i>
+          <>
+            <div className="table-header">
+              <h2>
+                {activeTakeAwayOrder
+                  ? activeTakeAwayOrder.name
+                  : "No order selected"}
+              </h2>
+              <p>Order Section</p>
+              <div className="edit-icon" onClick={handleCustomerIconClick}>
+                <i
+                  className="fa-shopping-bag fas"
+                  onClick={handleCustomerIconClick}
+                ></i>
+              </div>
             </div>
-          </div>
+            <div
+              style={{
+                borderBottom: "1px solid #e8e8e8",
+                marginBottom: "15px",
+                paddingBottom: "10px",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "15px",
+                  color: "#8c8c8c",
+                  margin: "0",
+                  fontWeight: "400",
+                }}
+              >
+                Customer : {selectedCustomer?.name || "No customer selected"}
+              </p>
+            </div>
+          </>
         );
 
       case "Delivery":
         return (
-          <div className="table-header">
-            <h2>
-              {activeDeliveryOrder
-                ? activeDeliveryOrder.name
-                : "No order selected"}
-            </h2>
-            <p>Delivery Section</p>
-            <div className="edit-icon">
-              <i className="fa-motorcycle fas" onClick={handleCustomerIconClick}></i>
+          <>
+            <div className="table-header">
+              <h2>
+                {activeDeliveryOrder
+                  ? activeDeliveryOrder.name
+                  : "No order selected"}
+              </h2>
+              <p>Delivery Section</p>
+              <div className="edit-icon" onClick={handleCustomerIconClick}>
+                <i
+                  className="fa-motorcycle fas"
+                  onClick={handleCustomerIconClick}
+                ></i>
+              </div>
             </div>
-          </div>
+            <div
+              style={{
+                borderBottom: "1px solid #e8e8e8",
+                marginBottom: "15px",
+                paddingBottom: "10px",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "15px",
+                  color: "#8c8c8c",
+                  margin: "0",
+                  fontWeight: "400",
+                }}
+              >
+                Customer : {selectedCustomer?.name || "No customer selected"}
+              </p>
+            </div>
+          </>
         );
 
       default:

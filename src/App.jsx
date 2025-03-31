@@ -1,22 +1,13 @@
-import React from 'react';
-import { BrowserRouter, RouterProvider } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { OrganizationProvider } from './context/OrganizationContext';
-import { TableProvider } from './context/TableContext';
-import { router } from './route/router';
+import React from "react";
+import { RouterProvider } from "react-router-dom";
+import { router } from "./route/router";
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <OrganizationProvider>
-          <TableProvider>
-                <RouterProvider router={router} />
-          </TableProvider>
-        </OrganizationProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <div className="App">
+      <RouterProvider router={router} />
+    </div>
   );
 }
 
-export default App; 
+export default App;
