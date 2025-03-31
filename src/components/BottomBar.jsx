@@ -8,6 +8,7 @@ import { useServiceType } from "../context/ServiceTypeContext";
 import { useTakeAway } from "../context/TakeAwayContext";
 import { message } from "antd";
 import { useDelivery } from "../context/DeliveryContext";
+import { useCart } from "../context/CartContext";
 
 const SERVICE_TYPE_MAP = {
   "Dine in": 0,
@@ -22,6 +23,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   const { selectedServiceType } = useServiceType();
   const { addTakeAwayOrder, handleTakeAwayOrderSelect, clearActiveOrder } = useTakeAway();
   const { addDeliveryOrder, handleDeliveryOrderSelect, clearActiveDeliveryOrder } = useDelivery(); 
+  const { cartData } = useCart();
   const BASE_URL = process.env.REACT_APP_API_URL;
   const organizationId = "1e7071f0-dacb-4a98-f264-08dcb066d923";
 
@@ -81,7 +83,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     } finally {
       setDineInLoading(false);
     }
-  }, [accessToken, BASE_URL, organizationId]);
+  }, [accessToken, BASE_URL, organizationId, cartData]);
 
   // Take-away specific functions
   const fetchTakeawayOrders = useCallback(async () => {
@@ -217,7 +219,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
       handleDeliveryOrderSelect(table);
       setSelectedTableId(null);
       clearActiveOrder();
-    } else {
+    } else { 
       setSelectedTableId(table.id);
       onTableSelect(table);
       clearActiveOrder();

@@ -14,6 +14,7 @@ import CardTypeSelector from "./CardTypeSelector";
 import PaymentModal from "./PaymentModal";
 import { Typography } from "antd";
 import { useServiceType } from "../context/ServiceTypeContext";
+import CustomerCreationModal from "./CustomerCreationModal";
 
 const { Title, Text } = Typography;
 
@@ -21,7 +22,14 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   const { selectedOrganizationId } = useContext(OrganizationContext);
   const { selectedTableId, setSelectedTableId } = useContext(TableContext);
   const { accessToken } = useContext(AuthContext);
-  const { cartData, setCartData, cartLoading, setCartLoading, cartError, setCartError } = useCart();
+  const {
+    cartData,
+    setCartData,
+    cartLoading,
+    setCartLoading,
+    cartError,
+    setCartError,
+  } = useCart();
   const {
     activeTakeAwayOrder,
     cartDetails,
@@ -47,6 +55,15 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   const [discount, setDiscount] = useState("0");
   const [selectedCardType, setSelectedCardType] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
+
+  const handleCustomerIconClick = () => {
+    setIsCustomerModalVisible(true);
+  };
+
+  const handleCustomerModalClose = () => {
+    setIsCustomerModalVisible(false);
+  };
 
   const getOrderDetails = () => {
     switch (selectedServiceType) {
@@ -114,9 +131,9 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               return;
             }
             endpoint = `${BASE_URL}Cart/get-cart-details`;
-            params = { 
-              Guid: selectedTable.id, 
-              OrganizationsId: selectedOrganizationId 
+            params = {
+              Guid: selectedTable.id,
+              OrganizationsId: selectedOrganizationId,
             };
             shouldFetch = true;
             break;
@@ -138,33 +155,36 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               return;
             }
             endpoint = `${BASE_URL}Cart/get-cart-details`;
-            params = { 
-              Guid: activeTakeAwayOrder.id, 
-              OrganizationsId: selectedOrganizationId 
+            params = {
+              Guid: activeTakeAwayOrder.id,
+              OrganizationsId: selectedOrganizationId,
             };
             shouldFetch = true;
             break;
 
-            case "Delivery":
-              if (!activeDeliveryOrder?.id) {
-                console.log("No active Delivery order");
-                setCartData(null);
-                setCartLoading(false);
-                return;
-              }
-              if (deliveryCartDetails) {
-                console.log("Using cached Delivery cart details");
-                setCartData({
-                  ...deliveryCartDetails,
-                  serviceType: "Delivery",
-                });
-                setCartLoading(false);
-                return;
-              }
-              endpoint = `${BASE_URL}Cart/get-cart-details`;
-              params = { Guid: activeDeliveryOrder.id, OrganizationsId: selectedOrganizationId };
-              shouldFetch = true;
-              break;
+          case "Delivery":
+            if (!activeDeliveryOrder?.id) {
+              console.log("No active Delivery order");
+              setCartData(null);
+              setCartLoading(false);
+              return;
+            }
+            if (deliveryCartDetails) {
+              console.log("Using cached Delivery cart details");
+              setCartData({
+                ...deliveryCartDetails,
+                serviceType: "Delivery",
+              });
+              setCartLoading(false);
+              return;
+            }
+            endpoint = `${BASE_URL}Cart/get-cart-details`;
+            params = {
+              Guid: activeDeliveryOrder.id,
+              OrganizationsId: selectedOrganizationId,
+            };
+            shouldFetch = true;
+            break;
 
           default:
             console.log("Invalid service type");
@@ -178,7 +198,10 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           return;
         }
 
-        console.log(`Fetching ${selectedServiceType} cart with params:`, params);
+        console.log(
+          `Fetching ${selectedServiceType} cart with params:`,
+          params
+        );
         const response = await axios.get(endpoint, {
           params,
           headers: {
@@ -219,14 +242,14 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     [
       selectedServiceType,
       activeTakeAwayOrder,
-      activeDeliveryOrder, 
+      activeDeliveryOrder,
       selectedTable,
       selectedOrganizationId,
       accessToken,
       cartDetails,
-      deliveryCartDetails, 
+      deliveryCartDetails,
       updateCartDetails,
-      updateDeliveryCartDetails, 
+      updateDeliveryCartDetails,
       BASE_URL,
       setCartData,
       setCartLoading,
@@ -239,7 +262,9 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     (service) => {
       if (service === selectedServiceType) return;
 
-      console.log(`Switching service type from ${selectedServiceType} to ${service}`);
+      console.log(
+        `Switching service type from ${selectedServiceType} to ${service}`
+      );
       setIsTransitioning(true);
       resetCartState();
 
@@ -300,16 +325,16 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     [
       selectedServiceType,
       switchTakeAwayServiceType,
-      switchDeliveryServiceType, 
+      switchDeliveryServiceType,
       fetchCartDetails,
       activeTakeAwayOrder,
-      activeDeliveryOrder, 
+      activeDeliveryOrder,
       selectedTable,
       setSelectedTableId,
       onClearTable,
       setSelectedServiceType,
       clearActiveOrder,
-      clearActiveDeliveryOrder, 
+      clearActiveDeliveryOrder,
       resetCartState,
     ]
   );
@@ -342,7 +367,15 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     }
 
     fetchCartDetails();
-  }, [selectedServiceType, selectedTable, activeTakeAwayOrder, activeDeliveryOrder, isTransitioning, fetchCartDetails, resetCartState]);
+  }, [
+    selectedServiceType,
+    selectedTable,
+    activeTakeAwayOrder,
+    activeDeliveryOrder,
+    isTransitioning,
+    fetchCartDetails,
+    resetCartState,
+  ]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -357,7 +390,11 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   }, [cartLoading, isTransitioning]);
 
   const handleNoteInputChange = (index, value) => {
-    if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
+    if (
+      !cartData?.cartDetails?.[index] ||
+      cartData.cartDetails[index].isKot !== 0
+    )
+      return;
 
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
@@ -367,7 +404,11 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   };
 
   const handleQuantityIncrease = (index) => {
-    if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
+    if (
+      !cartData?.cartDetails?.[index] ||
+      cartData.cartDetails[index].isKot !== 0
+    )
+      return;
 
     setCartData((prev) => {
       const newCartDetails = [...prev.cartDetails];
@@ -392,14 +433,23 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   };
 
   const handleAddNoteToDatabase = async (index) => {
-    if (!cartData?.cartDetails?.[index] || cartData.cartDetails[index].isKot !== 0) return;
+    if (
+      !cartData?.cartDetails?.[index] ||
+      cartData.cartDetails[index].isKot !== 0
+    )
+      return;
 
     const noteValue = cartData.cartDetails[index].note || "";
     try {
       await axios.post(
         `${BASE_URL}Cart/add-note`,
         { cartDetailId: cartData.cartDetails[index].id, note: noteValue },
-        { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
       await fetchCartDetails();
     } catch (err) {
@@ -415,7 +465,10 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
   };
 
   const calculateBalance = () =>
-    (parseFloat(amountEntered || "0.00") - parseFloat(calculateDiscountedTotal())).toFixed(2);
+    (
+      parseFloat(amountEntered || "0.00") -
+      parseFloat(calculateDiscountedTotal())
+    ).toFixed(2);
 
   const handlePlaceOrder = async () => {
     const orderDetails = getOrderDetails();
@@ -433,7 +486,12 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       await axios.post(
         `${BASE_URL}Cart/place-order?TableId=${orderDetails.id}`,
         {},
-        { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
       await fetchCartDetails();
       message.success("Order placed successfully!");
@@ -507,12 +565,16 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         details: details,
       };
 
-      const response = await axios.post(`${BASE_URL}Invoice/create-invoice-new`, orderData, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await axios.post(
+        `${BASE_URL}Invoice/create-invoice-new`,
+        orderData,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (response.status === 200 || response.status === 201) {
         message.success(`Payment successful via ${method}!`);
@@ -547,7 +609,8 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         handlePaymentConfirm(selectedPayment);
       }
     } else {
-      const currentAmount = amountEntered === "0.00" ? "" : amountEntered.replace(".00", "");
+      const currentAmount =
+        amountEntered === "0.00" ? "" : amountEntered.replace(".00", "");
       const newValue = currentAmount + value;
       setAmountEntered(newValue + ".00");
     }
@@ -599,17 +662,22 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     if (selectedServiceType === "Take Away" && !activeTakeAwayOrder?.id) {
       return <NoTakeAwayOrderSelectedView />;
     }
-    
+
     // Added check for Delivery with a custom view, like Take Away
     if (selectedServiceType === "Delivery" && !activeDeliveryOrder?.id) {
       return <NoDeliveryOrderSelectedView />;
     }
 
-    if (!cartData || (cartData && (!cartData.cartDetails || cartData.cartDetails.length === 0))) {
+    if (
+      !cartData ||
+      (cartData && (!cartData.cartDetails || cartData.cartDetails.length === 0))
+    ) {
       return <EmptyCartView serviceType={selectedServiceType} />;
     }
 
-    return <CartItemsList cartData={cartData} onUpdateItem={handleItemUpdate} />;
+    return (
+      <CartItemsList cartData={cartData} onUpdateItem={handleItemUpdate} />
+    );
   };
 
   const renderHeader = () => {
@@ -620,7 +688,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             <h2>{selectedTable ? selectedTable.name : "No table selected"}</h2>
             <p>Table Section</p>
             <div className="edit-icon">
-              <i className="fa-edit fas"></i>
+              <i className="fa-edit fas" onClick={handleCustomerIconClick}></i>
             </div>
           </div>
         );
@@ -628,10 +696,14 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       case "Take Away":
         return (
           <div className="table-header">
-            <h2>{activeTakeAwayOrder ? activeTakeAwayOrder.name : "No order selected"}</h2>
+            <h2>
+              {activeTakeAwayOrder
+                ? activeTakeAwayOrder.name
+                : "No order selected"}
+            </h2>
             <p>Order Section</p>
             <div className="edit-icon">
-              <i className="fa-shopping-bag fas"></i>
+              <i className="fa-shopping-bag fas" onClick={handleCustomerIconClick}></i>
             </div>
           </div>
         );
@@ -639,10 +711,14 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       case "Delivery":
         return (
           <div className="table-header">
-            <h2>{activeDeliveryOrder ? activeDeliveryOrder.name : "No order selected"}</h2>
+            <h2>
+              {activeDeliveryOrder
+                ? activeDeliveryOrder.name
+                : "No order selected"}
+            </h2>
             <p>Delivery Section</p>
             <div className="edit-icon">
-              <i className="fa-motorcycle fas"></i>
+              <i className="fa-motorcycle fas" onClick={handleCustomerIconClick}></i>
             </div>
           </div>
         );
@@ -659,7 +735,9 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         {["Dine in", "Take Away", "Delivery"].map((service) => (
           <button
             key={service}
-            className={`service-btn ${selectedServiceType === service ? "active" : ""}`}
+            className={`service-btn ${
+              selectedServiceType === service ? "active" : ""
+            }`}
             onClick={() => handleServiceTypeChange(service)}
           >
             {service}
@@ -697,12 +775,18 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         {["Cash", "Card", "QR"].map((method) => (
           <button
             key={method}
-            className={`payment-btn ${selectedPayment === method ? "active" : ""}`}
+            className={`payment-btn ${
+              selectedPayment === method ? "active" : ""
+            }`}
             onClick={() => setSelectedPayment(method)}
           >
             <i
               className={`fas fa-${
-                method === "Cash" ? "money-bill-wave" : method === "Card" ? "credit-card" : "qrcode"
+                method === "Cash"
+                  ? "money-bill-wave"
+                  : method === "Card"
+                  ? "credit-card"
+                  : "qrcode"
               }`}
             ></i>{" "}
             {method === "Card" ? "Credit/Debit Card" : method}
@@ -717,6 +801,11 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       <button className="finish-order-btn" onClick={handleFinishOrder}>
         Finish Order
       </button>
+
+      <CustomerCreationModal
+        visible={isCustomerModalVisible}
+        onClose={handleCustomerModalClose}
+      />
 
       <PaymentModal
         title="Cash Payment"
@@ -761,7 +850,10 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                 fontWeight: "bold",
               }}
               onClick={() => handlePaymentConfirm("Cash")}
-              disabled={parseFloat(amountEntered) < parseFloat(calculateDiscountedTotal())}
+              disabled={
+                parseFloat(amountEntered) <
+                parseFloat(calculateDiscountedTotal())
+              }
             >
               Pay Now
             </Button>
@@ -819,7 +911,8 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               }}
               onClick={() => handlePaymentConfirm("Card")}
               disabled={
-                parseFloat(amountEntered) < parseFloat(calculateDiscountedTotal()) || !selectedCardType
+                parseFloat(amountEntered) <
+                  parseFloat(calculateDiscountedTotal()) || !selectedCardType
               }
             >
               Confirm Payment
@@ -886,13 +979,21 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                 fontWeight: "bold",
               }}
               onClick={() => handlePaymentConfirm("QR")}
-              disabled={parseFloat(amountEntered) < parseFloat(calculateDiscountedTotal())}
+              disabled={
+                parseFloat(amountEntered) <
+                parseFloat(calculateDiscountedTotal())
+              }
             >
               Confirm Payment
             </Button>
           </div>
         </Col>
       </PaymentModal>
+
+      <CustomerCreationModal
+        visible={isCustomerModalVisible}
+        onClose={handleCustomerModalClose}
+      />
     </aside>
   );
 };
@@ -903,9 +1004,15 @@ const LoadingView = ({ isTransitioning }) => (
       <i className="fa-spin fa-spinner fas"></i>
     </div>
     <div className="loading-text">
-      <p>{isTransitioning ? "Switching service type..." : "Loading cart items..."}</p>
+      <p>
+        {isTransitioning
+          ? "Switching service type..."
+          : "Loading cart items..."}
+      </p>
       {!isTransitioning && (
-        <p className="sub-text">Please wait while we fetch your order details</p>
+        <p className="sub-text">
+          Please wait while we fetch your order details
+        </p>
       )}
     </div>
   </div>
