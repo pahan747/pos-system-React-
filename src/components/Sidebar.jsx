@@ -57,7 +57,7 @@ const Sidebar = () => {
       </div>
       <ul className="nav-links">
         <li>
-          <Link to="#" className="active">
+          <Link to="/" className="active">
             <i className="fas fa-utensils"></i> Menu
           </Link>
         </li>
@@ -67,8 +67,8 @@ const Sidebar = () => {
           </Link>
         </li>
         <li>
-          <Link to="#">
-            <i className="fas fa-calendar-alt"></i> Reservation
+          <Link to="/orders">
+            <i className="fas fa-calendar-alt"></i> Orders
           </Link>
         </li>
         <li>

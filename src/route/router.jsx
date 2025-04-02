@@ -3,6 +3,7 @@ import HomePage from "../pages/HomePage";
 import LoginPage from "../pages/LoginPage";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
+import InvoicePage from "../pages/InvoicePage";
 
 // ProtectedRoute Component
 const ProtectedRoute = () => {
@@ -33,6 +34,10 @@ export const router = createBrowserRouter([
             {
                 path: "/home",
                 element: <HomePage />, // HomePage is only accessible if authenticated
+            },
+            {
+                path: "/orders",
+                element: <InvoicePage />, // InvoicePage is only accessible if authenticated
             },
         ],
     },
