@@ -1,0 +1,171 @@
+/* Bottom Bar Base Styles */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 90px;
+  background-color: #fff;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 1.5vh;
+  border-top: 2px solid #4caf50;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  scroll-behavior: smooth;
+}
+
+/* Hide Scrollbar but Keep Functionality */
+.bottom-bar::-webkit-scrollbar {
+  height: 5px;
+}
+
+.bottom-bar::-webkit-scrollbar-thumb {
+  background: #bdbcbc;
+  border-radius: 5px;
+}
+
+.bottom-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bottom-bar {
+  -ms-overflow-style: none;
+  scrollbar-width: thin;
+}
+
+/* Table Status Styles */
+.table-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 1vh 1.5vw;
+  border-radius: 25px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 350px;
+  max-width: 400px;
+  justify-content: space-between;
+  margin-right: 1vw;
+  background-color: #f9f9f9;
+}
+
+/* Table ID */
+.table-id {
+  font-weight: 600;
+  margin-right: 1vw;
+  color: #fff;
+  background-color: #ffc107;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  padding: 10px;
+}
+
+/* Table Info */
+.table-info {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  font-size: 14px;
+  text-align: left;
+}
+
+.table-info p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.table-info p:first-child {
+  font-weight: bold;
+  color: #333;
+}
+
+/* Process Status */
+.process-status {
+  padding: 0.5vh 1vw;
+  border-radius: 15px;
+  font-weight: bold;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.process-status.Process {
+  background-color: #ff9800;
+  color: white;
+}
+
+.process-status.Open {
+  background-color: #4caf50;
+  color: white;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Add Order Button */
+.add-order-btn {
+  background-color: #52c41a;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.add-order-btn i {
+  font-size: 14px;
+  background-color: rgba(255, 255, 255, 0.2);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 4px;
+}
+
+.add-order-btn:hover {
+  background-color: #389e0d;
+}
+
+.add-order-btn:hover i {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 480px) {
+  .table-status {
+    min-width: 160px;
+    max-width: 200px;
+    padding: 0.6vh 0.8vw;
+  }
+
+  .table-id {
+    width: 30px;
+    height: 30px;
+  }
+
+  .table-info p {
+    font-size: 12px;
+  }
+
+  .process-status {
+    padding: 0.4vh 0.8vw;
+    font-size: 10px;
+  }
+}

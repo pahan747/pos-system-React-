@@ -1,0 +1,73 @@
+/* Container for categories */
+.menu-categories-wrapper {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: row;
+  margin-bottom: 20px;
+}
+
+/* Wrapper for the individual categories */
+.menu-categories {
+  gap: 20px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Style for each category item */
+.category {
+  display: flex;
+  flex-direction: column; /* Stack icon and text vertically */
+  align-items: center; /* Center content horizontally */
+  text-align: center; /* Center text */
+  cursor: pointer; /* Pointer cursor on hover */
+  transition: transform 0.2s ease, color 0.2s ease; /* Smooth hover effects */
+}
+
+.category-icon {
+  font-size: 2rem; /* Adjust icon size */
+  margin-bottom: 8px; /* Space between icon and text */
+  color: #333; /* Default icon color */
+}
+
+.category-icon img {
+  width: 40px; /* Adjust size for image icons */
+  height: 40px;
+}
+
+/* Hover effect for category items */
+.category:hover {
+  transform: scale(1.05);
+  color: #85898d;
+}
+
+/* Category name styles */
+.category p {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  padding: 0px 20px;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+/* Responsive styling for small screens */
+@media (max-width: 768px) {
+  .menu-categories {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .menu-categories {
+    grid-template-columns: 1fr;
+  }
+  .category p {
+    font-size: 14px;
+  }
+}
