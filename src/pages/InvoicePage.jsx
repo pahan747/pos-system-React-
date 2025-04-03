@@ -5,6 +5,11 @@ import OrganizationDropdown from "../components/OrganizationDropdown";
 import InvoiceTable from "../components/InvoiceTable";
 import { AuthContext } from "../context/AuthContext";
 
+const formatDateForComparison = (dateString) => {
+  const date = new Date(dateString);
+  return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+};
+
 const InvoicePage = () => {
   const { accessToken } = useContext(AuthContext);
   const [invoices, setInvoices] = useState([]);
@@ -35,12 +40,14 @@ const InvoicePage = () => {
         config
       );
 
-      // Transform the response data
+      // Transform the response data with additional date fields for filtering
       const transformedInvoices = response.data.map((invoice) => ({
         invoiceNumber: invoice.invoiceNumber,
         customerName: invoice.customerName || "N/A", // Handle null values
-        issueDate: new Date(invoice.createUtc).toLocaleDateString(), // Format date
-        dueDate: new Date(invoice.dueDate).toLocaleDateString(), // Format date
+        issueDate: new Date(invoice.createUtc).toLocaleDateString(), // Format date for display
+        issueDateForComparison: formatDateForComparison(invoice.createUtc), // For filtering
+        dueDate: new Date(invoice.dueDate).toLocaleDateString(), // Format date for display
+        dueDateForComparison: formatDateForComparison(invoice.dueDate), // For filtering
         totalAmount: `$${invoice.total.toFixed(2)}`, // Format amount
         status: invoice.status === 0 ? "Unpaid" : "Paid", // Map status
         paymentType: invoice.paymentType,
@@ -54,23 +61,33 @@ const InvoicePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, BASE_URL]);
 
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
 
   const filteredInvoices = invoices.filter((invoice) => {
+    // Text search filter
     const searchMatch =
       invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.customerName.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Status filter
     const statusMatch = statusFilter ? invoice.status === statusFilter : true;
-    const startDateMatch = startDateFilter
-      ? new Date(invoice.issueDate) >= new Date(startDateFilter)
+    
+    // Date filters using the normalized YYYY-MM-DD strings for comparison
+    const formattedStartDate = startDateFilter ? formatDateForComparison(startDateFilter) : '';
+    const formattedEndDate = endDateFilter ? formatDateForComparison(endDateFilter) : '';
+    
+    const startDateMatch = formattedStartDate
+      ? invoice.issueDateForComparison >= formattedStartDate
       : true;
-    const endDateMatch = endDateFilter
-      ? new Date(invoice.dueDate) <= new Date(endDateFilter)
+    
+    const endDateMatch = formattedEndDate
+      ? invoice.dueDateForComparison <= formattedEndDate
       : true;
+    
     return searchMatch && statusMatch && startDateMatch && endDateMatch;
   });
 
@@ -81,7 +98,7 @@ const InvoicePage = () => {
       <Sidebar />
       <main className="main-content">
         <div className="dropdown-container">
-        <h1>Orders</h1>
+          <h1>Orders</h1>
           <OrganizationDropdown />
         </div>
         {loading ? (
