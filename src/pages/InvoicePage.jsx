@@ -91,7 +91,7 @@ const InvoicePage = () => {
     return searchMatch && statusMatch && startDateMatch && endDateMatch;
   });
 
-  const totalPages = Math.ceil(filteredInvoices.length / 5);
+  const totalPages = Math.ceil(filteredInvoices.length / 10);
 
   return (
     <div className="container-invoice">

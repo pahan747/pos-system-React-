@@ -535,7 +535,8 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           price: item.price || 0,
           amount: (item.qty || 0) * (item.price || 0),
           status: 0,
-          spicy: "",
+          spicy: item.note || "",
+          name: item.name || "",
         }));
 
       const subTotal = parseFloat(cartData?.subTotal || "0.00");
@@ -579,6 +580,21 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       );
 
       if (response.status === 200 || response.status === 201) {
+        // First delete the cart
+        try {
+          await axios.delete(`${BASE_URL}Cart/delete-cart`, {
+            params: { tableId: orderDetails.id },
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+        } catch (error) {
+          console.error("Failed to delete cart:", error);
+          // Continue with other operations even if cart deletion fails
+        }
+
+        // Then proceed with existing success operations
         message.success(`Payment successful via ${method}!`);
         resetCartState();
         setShowCashModal(false);
@@ -588,7 +604,8 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         setDiscount("0");
         setSelectedCardType(null);
         setSelectedPayment(null);
-        // Clear active Delivery order after payment, like Take Away
+        
+        // Clear active orders based on service type
         if (selectedServiceType === "Take Away") {
           clearActiveOrder();
         } else if (selectedServiceType === "Delivery") {

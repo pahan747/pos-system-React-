@@ -14,7 +14,16 @@ const InvoiceTable = ({
   endDateFilter,
   onEndDateFilterChange,
 }) => {
-  const invoicesPerPage = 5;
+  // Changed from 5 to 10 invoices per page
+  const invoicesPerPage = 10;
+  
+  // Calculate total pages based on the actual invoices length
+  const calculatedTotalPages = Math.ceil(invoices.length / invoicesPerPage);
+  
+  // Use calculated total pages if totalPages prop is not provided
+  const effectiveTotalPages = totalPages || calculatedTotalPages;
+  
+  // Calculate proper indices for slicing (adjusted for 10 items per page)
   const indexOfLastInvoice = currentPage * invoicesPerPage;
   const indexOfFirstInvoice = indexOfLastInvoice - invoicesPerPage;
   const currentInvoices = invoices.slice(
@@ -113,7 +122,7 @@ const InvoiceTable = ({
 
       {/* Table container with horizontal scroll */}
       <div style={{ overflowX: "auto" }}>
-        {/* Table with fixed width columns for consistency, increased min-width to accommodate extra column */}
+        {/* Table with fixed width columns for consistency */}
         <table
           style={{
             width: "100%",
@@ -235,152 +244,169 @@ const InvoiceTable = ({
             </tr>
           </thead>
           <tbody>
-            {currentInvoices.map((invoice, index) => (
-              <tr
-                key={invoice.invoiceNumber}
-                style={{
-                  backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8f8f8",
-                }}
-              >
-                <td
+            {currentInvoices.length > 0 ? (
+              currentInvoices.map((invoice, index) => (
+                <tr
+                  key={invoice.invoiceNumber}
                   style={{
-                    padding: "12px 15px",
-                    borderBottom: `1px solid ${borderColor}`,
-                    color: "#666",
-                    fontSize: "14px",
+                    backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8f8f8",
                   }}
                 >
-                  {invoice.invoiceNumber}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 15px",
-                    borderBottom: `1px solid ${borderColor}`,
-                    color: "#444",
-                    fontWeight: "500",
-                    fontSize: "14px",
-                  }}
-                >
-                  {invoice.customerName}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 15px",
-                    borderBottom: `1px solid ${borderColor}`,
-                    color: "#666",
-                    fontSize: "14px",
-                  }}
-                >
-                  {invoice.issueDate}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 15px",
-                    borderBottom: `1px solid ${borderColor}`,
-                    color: "#666",
-                    fontSize: "14px",
-                  }}
-                >
-                  {invoice.dueDate}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 15px",
-                    borderBottom: `1px solid ${borderColor}`,
-                    color: "#666",
-                    fontSize: "14px",
-                  }}
-                >
-                  {invoice.totalAmount}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 15px",
-                    borderBottom: `1px solid ${borderColor}`,
-                    color: "#666",
-                    fontSize: "14px",
-                  }}
-                >
-                  {invoice.noOfItems}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 15px",
-                    borderBottom: `1px solid ${borderColor}`,
-                    fontSize: "14px",
-                  }}
-                >
-                  <span
+                  <td
                     style={{
-                      padding: "4px 8px",
-                      borderRadius: "4px",
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                      backgroundColor:
-                        invoice.status === "Paid"
-                          ? "#dff5e5"
-                          : invoice.status === "Unpaid"
-                          ? "#fcf2d6"
-                          : "#fbe7e7",
-                      color:
-                        invoice.status === "Paid"
-                          ? "#2e7d32"
-                          : invoice.status === "Unpaid"
-                          ? "#ed6c02"
-                          : "#d32f2f",
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      color: "#666",
+                      fontSize: "14px",
                     }}
                   >
-                    {invoice.status}
-                  </span>
-                </td>
+                    {invoice.invoiceNumber}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      color: "#444",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {invoice.customerName}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      color: "#666",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {invoice.issueDate}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      color: "#666",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {invoice.dueDate}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      color: "#666",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {invoice.totalAmount}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      color: "#666",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {invoice.noOfItems}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      fontSize: "14px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: "4px",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        backgroundColor:
+                          invoice.status === "Paid"
+                            ? "#dff5e5"
+                            : invoice.status === "Unpaid"
+                            ? "#fcf2d6"
+                            : "#fbe7e7",
+                        color:
+                          invoice.status === "Paid"
+                            ? "#2e7d32"
+                            : invoice.status === "Unpaid"
+                            ? "#ed6c02"
+                            : "#d32f2f",
+                      }}
+                    >
+                      {invoice.status}
+                    </span>
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      color: "#666",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {invoice.paymentType}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 15px",
+                      borderBottom: `1px solid ${borderColor}`,
+                      fontSize: "14px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <button
+                      style={{
+                        padding: "6px 12px",
+                        backgroundColor: buttonColor,
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        marginRight: "8px",
+                      }}
+                    >
+                      View
+                    </button>
+                    <button
+                      style={{
+                        padding: "6px 12px",
+                        backgroundColor: "white",
+                        color: buttonColor,
+                        border: `1px solid ${buttonColor}`,
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Print
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
                 <td
+                  colSpan="9"
                   style={{
-                    padding: "12px 15px",
-                    borderBottom: `1px solid ${borderColor}`,
+                    padding: "20px",
+                    textAlign: "center",
                     color: "#666",
                     fontSize: "14px",
-                  }}
-                >
-                  {invoice.paymentType}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 15px",
                     borderBottom: `1px solid ${borderColor}`,
-                    fontSize: "14px",
-                    whiteSpace: "nowrap",
                   }}
                 >
-                  <button
-                    style={{
-                      padding: "6px 12px",
-                      backgroundColor: buttonColor,
-                      color: "white",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                      marginRight: "8px",
-                    }}
-                  >
-                    View
-                  </button>
-                  <button
-                    style={{
-                      padding: "6px 12px",
-                      backgroundColor: "white",
-                      color: buttonColor,
-                      border: `1px solid ${buttonColor}`,
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                    }}
-                  >
-                    Print
-                  </button>
+                  No invoices found.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -399,15 +425,15 @@ const InvoiceTable = ({
         }}
       >
         <button
-          disabled={currentPage === 1}
+          disabled={currentPage <= 1}
           onClick={() => onPageChange(currentPage - 1)}
           style={{
             padding: "6px 12px",
             border: `1px solid ${borderColor}`,
             borderRadius: "4px",
-            backgroundColor: currentPage === 1 ? "#f0f0f0" : "white",
-            color: currentPage === 1 ? "#999" : "#333",
-            cursor: currentPage === 1 ? "default" : "pointer",
+            backgroundColor: currentPage <= 1 ? "#f0f0f0" : "white",
+            color: currentPage <= 1 ? "#999" : "#333",
+            cursor: currentPage <= 1 ? "default" : "pointer",
             fontSize: "13px",
           }}
         >
@@ -420,18 +446,18 @@ const InvoiceTable = ({
             color: "#555",
           }}
         >
-          {`Page ${currentPage} of ${totalPages}`}
+          {`Page ${currentPage} of ${effectiveTotalPages || 1}`}
         </span>
         <button
-          disabled={currentPage === totalPages}
+          disabled={currentPage >= effectiveTotalPages}
           onClick={() => onPageChange(currentPage + 1)}
           style={{
             padding: "6px 12px",
             border: `1px solid ${borderColor}`,
             borderRadius: "4px",
-            backgroundColor: currentPage === totalPages ? "#f0f0f0" : "white",
-            color: currentPage === totalPages ? "#999" : "#333",
-            cursor: currentPage === totalPages ? "default" : "pointer",
+            backgroundColor: currentPage >= effectiveTotalPages ? "#f0f0f0" : "white",
+            color: currentPage >= effectiveTotalPages ? "#999" : "#333",
+            cursor: currentPage >= effectiveTotalPages ? "default" : "pointer",
             fontSize: "13px",
           }}
         >
