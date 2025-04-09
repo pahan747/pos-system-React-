@@ -16,13 +16,13 @@ const InvoiceTable = ({
 }) => {
   // Changed from 5 to 10 invoices per page
   const invoicesPerPage = 10;
-  
+
   // Calculate total pages based on the actual invoices length
   const calculatedTotalPages = Math.ceil(invoices.length / invoicesPerPage);
-  
+
   // Use calculated total pages if totalPages prop is not provided
   const effectiveTotalPages = totalPages || calculatedTotalPages;
-  
+
   // Calculate proper indices for slicing (adjusted for 10 items per page)
   const indexOfLastInvoice = currentPage * invoicesPerPage;
   const indexOfFirstInvoice = indexOfLastInvoice - invoicesPerPage;
@@ -44,6 +44,7 @@ const InvoiceTable = ({
         margin: "0 auto",
         boxShadow: "0 1px 4px rgba(0, 0, 0, 0.1)",
         border: `1px solid ${borderColor}`,
+        marginBottom: "50px",
         borderRadius: "4px",
         overflow: "hidden",
       }}
@@ -455,7 +456,8 @@ const InvoiceTable = ({
             padding: "6px 12px",
             border: `1px solid ${borderColor}`,
             borderRadius: "4px",
-            backgroundColor: currentPage >= effectiveTotalPages ? "#f0f0f0" : "white",
+            backgroundColor:
+              currentPage >= effectiveTotalPages ? "#f0f0f0" : "white",
             color: currentPage >= effectiveTotalPages ? "#999" : "#333",
             cursor: currentPage >= effectiveTotalPages ? "default" : "pointer",
             fontSize: "13px",

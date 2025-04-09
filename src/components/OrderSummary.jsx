@@ -6,7 +6,6 @@ import { useCart } from "../context/CartContext";
 import { useTakeAway } from "../context/TakeAwayContext";
 import { useDelivery } from "../context/DeliveryContext"; // Imported DeliveryContext to manage Delivery orders like Take Away
 import axios from "axios";
-import "../assets/css/components/OrderSummary.css";
 import { Button, Input, Col, message } from "antd";
 import ReceiptDetails from "./ReceiptDetails";
 import PaymentKeypad from "./PaymentKeypad";
@@ -16,6 +15,7 @@ import { Typography } from "antd";
 import { useServiceType } from "../context/ServiceTypeContext";
 import CustomerCreationModal from "./CustomerCreationModal";
 import { useCustomer } from "../context/CustomerContext";
+import "../assets/css/components/OrderSummary.css";
 
 const { Title, Text } = Typography;
 
@@ -405,18 +405,60 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     });
   };
 
-  const handleQuantityIncrease = (index) => {
+  const handleQuantityIncrease = async (index) => {
     if (
       !cartData?.cartDetails?.[index] ||
       cartData.cartDetails[index].isKot !== 0
     )
       return;
-
-    setCartData((prev) => {
-      const newCartDetails = [...prev.cartDetails];
-      newCartDetails[index].qty += 1;
-      return { ...prev, cartDetails: newCartDetails };
-    });
+  
+    try {
+      const item = cartData.cartDetails[index];
+      const orderDetails = getOrderDetails();
+      if (!orderDetails?.id) {
+        message.error("No active order found");
+        return;
+      }
+  
+      // Determine which type of order we're dealing with
+      const params = {
+        Guid: orderDetails.id,
+        ProductId: item.productId,
+        Qty: 1, // Adding 1 more to existing quantity
+        cusId: selectedCustomer?.id || "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        name: item.name,
+        value: item.price,
+        ordertype: ["Dine in", "Take Away", "Delivery"].indexOf(orderDetails.type),
+        OrganizationsId: selectedOrganizationId,
+      };
+  
+      // Make API call to add to cart (which increases quantity)
+      await axios.post(
+        `${BASE_URL}Cart/add-to-cart`,
+        null,
+        {
+          params,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      // Update local state optimistically for better UX
+      setCartData((prev) => {
+        const newCartDetails = [...prev.cartDetails];
+        newCartDetails[index].qty += 1;
+        return { ...prev, cartDetails: newCartDetails };
+      });
+  
+      // Refresh cart details from server
+      await fetchCartDetails(true);
+      
+    } catch (error) {
+      console.error("Failed to increase quantity:", error);
+      message.error("Failed to update quantity. Please try again.");
+    }
   };
 
   const handleQuantityDecrease = (index) => {

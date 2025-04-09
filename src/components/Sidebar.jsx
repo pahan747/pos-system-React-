@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import "./styles.css";
+import "../assets/css/components/MainStyles.css";
 import { Link } from "react-router-dom";
 import OtherServicesModal from "./OtherServicesModal";
 import axios from "axios";
@@ -103,4 +103,4 @@ const Sidebar = () => {
   );
 };
 
-export default Sidebar;
+export default Sidebar; 

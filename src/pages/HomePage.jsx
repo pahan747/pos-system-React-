@@ -5,6 +5,7 @@ import OrganizationDropdown from "../components/OrganizationDropdown";
 import { Input } from "antd";
 import TableOrderManager from "../components/TableOrderManager";
 
+
 const HomePage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [refetchTablesFn, setRefetchTablesFn] = useState(null);

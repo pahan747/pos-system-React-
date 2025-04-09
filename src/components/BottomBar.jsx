@@ -2,13 +2,13 @@
 import React, { useContext, useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
-import "../assets/css/components/BottomBar.css";
 import { TableContext } from "../context/TableContext";
 import { useServiceType } from "../context/ServiceTypeContext";
 import { useTakeAway } from "../context/TakeAwayContext";
 import { message } from "antd";
 import { useDelivery } from "../context/DeliveryContext";
 import { useCart } from "../context/CartContext";
+import "../assets/css/components/BottomBar.css";
 
 const SERVICE_TYPE_MAP = {
   "Dine in": 0,
