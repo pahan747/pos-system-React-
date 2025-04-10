@@ -1,4 +1,3 @@
-// src/components/BottomBar.js
 import React, { useContext, useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
@@ -8,6 +7,7 @@ import { useTakeAway } from "../context/TakeAwayContext";
 import { message } from "antd";
 import { useDelivery } from "../context/DeliveryContext";
 import { useCart } from "../context/CartContext";
+import { useCustomer } from "../context/CustomerContext";
 import "../assets/css/components/BottomBar.css";
 
 const SERVICE_TYPE_MAP = {
@@ -24,6 +24,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   const { addTakeAwayOrder, handleTakeAwayOrderSelect, clearActiveOrder } = useTakeAway();
   const { addDeliveryOrder, handleDeliveryOrderSelect, clearActiveDeliveryOrder } = useDelivery(); 
   const { cartData } = useCart();
+  const { selectedCustomer } = useCustomer();
   const BASE_URL = process.env.REACT_APP_API_URL;
   const organizationId = "1e7071f0-dacb-4a98-f264-08dcb066d923";
 
@@ -68,7 +69,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
           tableId: table.name,
           name: table.fullName,
           items: table.count,
-          status: table.status === 99 ? "Process" : "Open",
+          status: table.count > 0 ? "Process" : "Open",
         }))
         .sort((a, b) =>
           a.tableId.localeCompare(b.tableId, undefined, { numeric: true })
@@ -84,6 +85,17 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
       setDineInLoading(false);
     }
   }, [accessToken, BASE_URL, organizationId, cartData]);
+
+  // Add new function to update table status
+  const updateTableStatus = useCallback((tableId, items) => {
+    setTables(prevTables => 
+      prevTables.map(table => 
+        table.id === tableId 
+          ? { ...table, status: items > 0 ? "Process" : "Open" }
+          : table
+      )
+    );
+  }, []);
 
   // Take-away specific functions
   const fetchTakeawayOrders = useCallback(async () => {
@@ -133,7 +145,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
       const newOrder = addTakeAwayOrder();
 
       await axios.post(
-        `${BASE_URL}Cart/add-takeaway-order?tableId=${newOrder.id}&customerId=80ebf3b0-a2d7-49d2-6a06-08dcda15281e&orderType=1`,
+          `${BASE_URL}Cart/add-takeaway-order?tableId=${newOrder.id}&customerId=${selectedCustomer?.id}&orderType=1`,
         null,
         {
           headers: {
@@ -189,7 +201,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     try {
       const newOrder = addDeliveryOrder(); // Still use context to generate order
       await axios.post(
-        `${BASE_URL}Cart/add-delivery-order?tableId=${newOrder.id}&customerId=80ebf3b0-a2d7-49d2-6a06-08dcda15281e&orderType=2`,
+        `${BASE_URL}Cart/add-delivery-order?tableId=${newOrder.id}&customerId=${selectedCustomer?.id}&orderType=2`,
         null,
         { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
       );

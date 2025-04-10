@@ -425,7 +425,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         Guid: orderDetails.id,
         ProductId: item.productId,
         Qty: 1, // Adding 1 more to existing quantity
-        cusId: selectedCustomer?.id || "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        cusId: selectedCustomer?.id,
         name: item.name,
         value: item.price,
         ordertype: ["Dine in", "Take Away", "Delivery"].indexOf(orderDetails.type),
@@ -572,7 +572,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       const details = cartData.cartDetails
         .filter((item) => item.qty > 0 && item.price > 0)
         .map((item) => ({
-          productId: item.productId || "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          productId: item.productId,
           qty: item.qty || 0,
           price: item.price || 0,
           amount: (item.qty || 0) * (item.price || 0),
