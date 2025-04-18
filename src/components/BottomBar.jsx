@@ -97,6 +97,30 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     );
   }, []);
 
+  // Add new function to fetch cart details
+  const fetchCartDetails = useCallback(async (guid) => {
+    if (!guid || !accessToken) return;
+
+    try {
+      const config = {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      };
+
+      const response = await axios.get(
+        `${BASE_URL}Cart/get-cart-details?Guid=${guid}&OrganizationsId=${organizationId}`,
+        config
+      );
+
+      return response.data?.noOfItems || 0;
+    } catch (err) {
+      console.error("Error fetching cart details:", err);
+      return 0;
+    }
+  }, [accessToken, BASE_URL, organizationId]);
+
   // Take-away specific functions
   const fetchTakeawayOrders = useCallback(async () => {
     try {
@@ -118,16 +142,24 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
         config
       );
 
-      const transformedOrders = response.data
-        .map((order, index) => ({
-          id: order.tableId,
-          tableId: `TA ${index + 1}`,
-          name: `Take Away ${index + 1}`,
-          items: "0",
-          status: "Open",
-          createUtc: order.createUtc,
-        }))
-        .sort((a, b) => new Date(a.createUtc) - new Date(b.createUtc));
+      // Fetch cart details for each order
+      const ordersWithCartDetails = await Promise.all(
+        response.data.map(async (order, index) => {
+          const itemCount = await fetchCartDetails(order.tableId);
+          return {
+            id: order.tableId,
+            tableId: `TA ${index + 1}`,
+            name: `Take Away ${index + 1}`,
+            items: itemCount,
+            status: itemCount > 0 ? "Process" : "Open",
+            createUtc: order.createUtc,
+          };
+        })
+      );
+
+      const transformedOrders = ordersWithCartDetails.sort(
+        (a, b) => new Date(a.createUtc) - new Date(b.createUtc)
+      );
 
       setTakeawayOrders(transformedOrders);
     } catch (err) {
@@ -138,7 +170,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     } finally {
       setTakeawayLoading(false);
     }
-  }, [accessToken, BASE_URL, organizationId]);
+  }, [accessToken, BASE_URL, organizationId, fetchCartDetails]);
 
   const handleAddTakeAwayOrder = async () => {
     try {
@@ -174,28 +206,45 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
       if (!accessToken) throw new Error("Access token missing. Please log in.");
       setDeliveryLoading(true);
 
-      const config = { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } };
-      const response = await axios.get(`${BASE_URL}Cart/get-delivery-orders?OrganizationsId=${organizationId}`, config);
+      const config = { 
+        headers: { 
+          Authorization: `Bearer ${accessToken}`, 
+          "Content-Type": "application/json" 
+        } 
+      };
+      
+      const response = await axios.get(
+        `${BASE_URL}Cart/get-delivery-orders?OrganizationsId=${organizationId}`, 
+        config
+      );
 
-      const transformedOrders = response.data
-        .map((order, index) => ({
-          id: order.tableId,
-          tableId: `DL ${index + 1}`,
-          name: `Delivery ${index + 1}`,
-          items: "0",
-          status: "Open",
-          createUtc: order.createUtc,
-        }))
-        .sort((a, b) => new Date(a.createUtc) - new Date(b.createUtc));
+      // Fetch cart details for each order
+      const ordersWithCartDetails = await Promise.all(
+        response.data.map(async (order, index) => {
+          const itemCount = await fetchCartDetails(order.tableId);
+          return {
+            id: order.tableId,
+            tableId: `DL ${index + 1}`,
+            name: `Delivery ${index + 1}`,
+            items: itemCount,
+            status: itemCount > 0 ? "Process" : "Open",
+            createUtc: order.createUtc,
+          };
+        })
+      );
 
-      setDeliveryOrders(transformedOrders); // Local state
+      const transformedOrders = ordersWithCartDetails.sort(
+        (a, b) => new Date(a.createUtc) - new Date(b.createUtc)
+      );
+
+      setDeliveryOrders(transformedOrders);
     } catch (err) {
       console.error("Error fetching delivery orders:", err);
       message.error(err.response?.data?.message || "Failed to load delivery orders");
     } finally {
       setDeliveryLoading(false);
     }
-  }, [accessToken, BASE_URL, organizationId]);
+  }, [accessToken, BASE_URL, organizationId, fetchCartDetails]);
 
   const handleAddDeliveryOrder = async () => {
     try {
@@ -384,7 +433,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     } else if (selectedServiceType === "Delivery") {
       fetchDeliveryOrders();
     }
-  }, [selectedServiceType, fetchTakeawayOrders, fetchDeliveryOrders]);
+  }, [selectedServiceType, fetchTakeawayOrders, fetchDeliveryOrders, cartData]);
 
   // Main render
   const renderBottomBar = () => {
