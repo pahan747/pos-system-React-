@@ -677,6 +677,47 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     }
   };
 
+  const handleDeleteItem = async (index) => {
+    if (!cartData?.cartDetails?.[index]) return;
+
+    try {
+      const item = cartData.cartDetails[index];
+      console.log("Deleting item with ProductId:", item.productId);
+      const orderDetails = getOrderDetails();
+      if (!orderDetails?.id) {
+        message.error("No active order found");
+        return;
+      }
+
+      await axios.delete(`${BASE_URL}Cart/delete-cart-item`, {
+        params: {
+          Guid: orderDetails.id,
+          ProductId: item.productId,
+          OrganizationsId: selectedOrganizationId,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Update local state optimistically
+      setCartData((prev) => {
+        const newCartDetails = [...prev.cartDetails];
+        newCartDetails.splice(index, 1);
+        return { ...prev, cartDetails: newCartDetails };
+      });
+
+      // Refresh cart details from server
+      await fetchCartDetails(true);
+      message.success("Item removed successfully");
+      console.log();
+    } catch (error) {
+      console.error("Failed to delete item:", error);
+      message.error("Failed to remove item. Please try again.");
+    }
+  };
+
   const handleItemUpdate = useCallback(
     (index, action, value) => {
       if (!cartData?.cartDetails?.[index]) return;
@@ -694,6 +735,9 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         case "addNote":
           handleAddNoteToDatabase(index);
           break;
+        case "delete":
+          handleDeleteItem(index);
+          break;
         default:
           console.warn("Unknown update action:", action);
       }
@@ -704,6 +748,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       handleQuantityDecrease,
       handleNoteInputChange,
       handleAddNoteToDatabase,
+      handleDeleteItem,
     ]
   );
 
@@ -912,7 +957,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             }`}
             onClick={() => setSelectedPayment(method)}
           >
-            <i
+            {/* <i
               className={`fas fa-${
                 method === "Cash"
                   ? "money-bill-wave"
@@ -920,7 +965,8 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                   ? "credit-card"
                   : "qrcode"
               }`}
-            ></i>{" "}
+   
+                     ></i>{" "} */}
             {method === "Card" ? "Credit/Debit Card" : method}
           </button>
         ))}
@@ -1217,6 +1263,13 @@ const CartItemsList = ({ cartData, onUpdateItem }) => {
               onClick={() => onUpdateItem(index, "increase")}
             >
               +
+            </button>
+            <button
+              className="delete-btn"
+              onClick={() => onUpdateItem(index, "delete")}
+              disabled={item.isKot !== 0}
+            >
+              <i className="fas fa-trash"></i>
             </button>
           </div>
         </div>
