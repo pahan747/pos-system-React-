@@ -773,7 +773,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     if (selectedServiceType === "Delivery" && !activeDeliveryOrder?.id) {
       return <NoDeliveryOrderSelectedView />;
     }
-
+ 
     if (
       !cartData ||
       (cartData && (!cartData.cartDetails || cartData.cartDetails.length === 0))
@@ -798,7 +798,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               <p>Table Section</p>
               <div className="edit-icon" onClick={handleCustomerIconClick}>
                 <i
-                  className="fa-edit fas"
+                  className="fa-user fas"
                   onClick={handleCustomerIconClick}
                 ></i>
               </div>
@@ -836,7 +836,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               <p>Order Section</p>
               <div className="edit-icon" onClick={handleCustomerIconClick}>
                 <i
-                  className="fa-shopping-bag fas"
+                  className="fa-user fas"
                   onClick={handleCustomerIconClick}
                 ></i>
               </div>
@@ -874,7 +874,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               <p>Delivery Section</p>
               <div className="edit-icon" onClick={handleCustomerIconClick}>
                 <i
-                  className="fa-motorcycle fas"
+                  className="fa-user fas"
                   onClick={handleCustomerIconClick}
                 ></i>
               </div>
