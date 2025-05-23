@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import "../assets/css/components/MainStyles.css";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import OtherServicesModal from "./OtherServicesModal";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
@@ -10,7 +10,8 @@ const Sidebar = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [organizationData, setOrganizationData] = useState(null);
   const { selectedOrganizationId } = useContext(OrganizationContext);
-  const { accessToken } = useContext(AuthContext);
+  const { accessToken, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
   const BASE_URL = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
@@ -47,6 +48,11 @@ const Sidebar = () => {
 
   const handleClose = () => {
     setIsModalVisible(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -97,7 +103,7 @@ const Sidebar = () => {
           <p>Arlene McCoy</p>
         </div>
       </div>
-      <button className="logout-btn">Logout</button>
+      <button className="logout-btn" onClick={handleLogout}>Logout</button>
       <OtherServicesModal visible={isModalVisible} onClose={handleClose} />
     </aside>
   );
