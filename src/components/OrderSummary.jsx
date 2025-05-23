@@ -502,16 +502,27 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     }
   };
 
-  const calculateDiscountedTotal = () => {
-    const subTotal = parseFloat(cartData?.subTotal || "0.00");
+  const calculateSubTotal = () => {
+    if (!cartData?.cartDetails) return "0.00";
+    return cartData.cartDetails.reduce((sum, item) => {
+      return sum + (item.price * item.qty);
+    }, 0).toFixed(2);
+  };
+
+  const calculateTotal = () => {
+    const subTotal = parseFloat(calculateSubTotal());
+    const tax = parseFloat(cartData?.tax || "0.00");
+    const service = parseFloat(cartData?.service || "0.00");
     const discountPercentage = parseFloat(discount || "0") / 100;
-    return (subTotal - subTotal * discountPercentage).toFixed(2);
+    const discountAmount = subTotal * discountPercentage;
+    
+    return (subTotal + tax + service - discountAmount).toFixed(2);
   };
 
   const calculateBalance = () =>
     (
       parseFloat(amountEntered || "0.00") -
-      parseFloat(calculateDiscountedTotal())
+      parseFloat(calculateTotal())
     ).toFixed(2);
 
   const handlePlaceOrder = async () => {
@@ -581,7 +592,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
           name: item.name || "",
         }));
 
-      const subTotal = parseFloat(cartData?.subTotal || "0.00");
+      const subTotal = parseFloat(calculateSubTotal());
       const discountAmount = subTotal * (parseFloat(discount || "0") / 100);
       const total = (
         subTotal +
@@ -666,7 +677,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     if (value === "C") {
       setAmountEntered("0.00");
     } else if (value === "OK") {
-      if (parseFloat(amountEntered) >= parseFloat(calculateDiscountedTotal())) {
+      if (parseFloat(amountEntered) >= parseFloat(calculateTotal())) {
         handlePaymentConfirm(selectedPayment);
       }
     } else {
@@ -929,7 +940,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       {cartData && !cartLoading && cartData.cartDetails.length > 0 && (
         <div className="totals">
           <p>
-            SubTotal: <span>${(cartData.subTotal || 0).toFixed(2)}</span>
+            SubTotal: <span>${calculateSubTotal()}</span>
           </p>
           <p>
             Tax: <span>${(cartData.tax || 0).toFixed(2)}</span>
@@ -943,7 +954,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             </p>
           )}
           <h3>
-            Total: <span>${(cartData.subTotal || 0).toFixed(2)}</span>
+            Total: <span>${calculateTotal()}</span>
           </h3>
         </div>
       )}
@@ -1001,7 +1012,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             discount={discount}
             setDiscount={setDiscount}
             amountEntered={amountEntered}
-            calculateDiscountedTotal={calculateDiscountedTotal}
+            calculateDiscountedTotal={calculateTotal}
             calculateBalance={calculateBalance}
           />
         </Col>
@@ -1030,7 +1041,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               onClick={() => handlePaymentConfirm("Cash")}
               disabled={
                 parseFloat(amountEntered) <
-                parseFloat(calculateDiscountedTotal())
+                parseFloat(calculateTotal())
               }
             >
               Pay Now
@@ -1055,7 +1066,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             discount={discount}
             setDiscount={setDiscount}
             amountEntered={amountEntered}
-            calculateDiscountedTotal={calculateDiscountedTotal}
+            calculateDiscountedTotal={calculateTotal}
             calculateBalance={calculateBalance}
           />
         </Col>
@@ -1090,7 +1101,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               onClick={() => handlePaymentConfirm("Card")}
               disabled={
                 parseFloat(amountEntered) <
-                  parseFloat(calculateDiscountedTotal()) || !selectedCardType
+                  parseFloat(calculateTotal()) || !selectedCardType
               }
             >
               Confirm Payment
@@ -1114,7 +1125,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             discount={discount}
             setDiscount={setDiscount}
             amountEntered={amountEntered}
-            calculateDiscountedTotal={calculateDiscountedTotal}
+            calculateDiscountedTotal={calculateTotal}
             calculateBalance={calculateBalance}
           />
         </Col>
@@ -1159,7 +1170,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               onClick={() => handlePaymentConfirm("QR")}
               disabled={
                 parseFloat(amountEntered) <
-                parseFloat(calculateDiscountedTotal())
+                parseFloat(calculateTotal())
               }
             >
               Confirm Payment
