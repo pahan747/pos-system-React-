@@ -513,10 +513,24 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     const subTotal = parseFloat(calculateSubTotal());
     const tax = parseFloat(cartData?.tax || "0.00");
     const service = parseFloat(cartData?.service || "0.00");
-    const discountPercentage = parseFloat(discount || "0") / 100;
-    const discountAmount = subTotal * discountPercentage;
+    const discountValue = parseFloat(discount || "0");
     
-    return (subTotal + tax + service - discountAmount).toFixed(2);
+    // Calculate discount amount (as a percentage of subtotal)
+    const discountAmount = (subTotal * (discountValue / 100));
+    
+    // Calculate final total
+    const finalTotal = (subTotal - discountAmount + tax + service).toFixed(2);
+    
+    console.log('Total Calculation:', {
+      subTotal,
+      tax,
+      service,
+      discountValue,
+      discountAmount,
+      finalTotal
+    });
+    
+    return finalTotal;
   };
 
   const calculateBalance = () =>
@@ -615,7 +629,13 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       throw new Error("No active order found");
     }
 
-    const paymentTypeMap = { Cash: 0, Card: 1, QR: 2 };
+    // Updated payment type mapping to match API expectations
+    const paymentTypeMap = { 
+      Cash: 1,  // Changed from 0 to 1
+      Card: 2,  // Changed from 1 to 2
+      QR: 3     // Changed from 2 to 3
+    };
+
     if (paymentTypeMap[method] === undefined) {
       console.error("Invalid payment method:", method);
       throw new Error("Invalid payment method");
@@ -650,30 +670,41 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     const tax = parseFloat(cartData?.tax || "0.00");
     const serviceCharge = parseFloat(cartData?.service || "0.00");
     const totalAmount = (subTotal + tax + serviceCharge - discountAmount).toFixed(2);
-    const paidAmount = parseFloat(amountEntered || "0.00");
+    
+    // For Cash payments, use amountEntered, for others use totalAmount
+    const paidAmount = method === "Cash" 
+      ? parseFloat(amountEntered || "0.00")
+      : parseFloat(totalAmount);
 
-    // Create a simpler orderData object with exactly what the API expects
+    // Validate paid amount
+    if (method === "Cash" && paidAmount < parseFloat(totalAmount)) {
+      throw new Error("Paid amount is less than total amount");
+    }
+
+    // Create orderData object with updated mappings
     const orderData = {
       invoiceNumber: `INV-${Date.now()}`,
       tableId: orderDetails.id,
-      type: ["Dine in", "Take Away", "Delivery"].indexOf(orderDetails.type),
+      type: orderDetails.type === "Dine in" ? 1 : 
+            orderDetails.type === "Take Away" ? 2 : 
+            orderDetails.type === "Delivery" ? 3 : 1, // Default to Dine in if unknown
       paymentType: paymentTypeMap[method],
-      status: 0,
+      status: 1, // Changed from 0 to 1 to indicate completed order
       dueDate: new Date().toISOString(),
       userId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       noOfItems: details.length,
       total: parseFloat(totalAmount),
-      discount: discountPercentage, // Send percentage value directly
+      discount: discountPercentage,
       tax: tax,
       subTotal: subTotal,
       serviceCharge: serviceCharge,
       paidAmount: paidAmount,
-      customerID: selectedCustomer?.id || "00000000-0000-0000-0000-000000000000", // Use default GUID if no customer
+      customerID: selectedCustomer?.id || "00000000-0000-0000-0000-000000000000",
       organizationId: selectedOrganizationId,
       details: details,
     };
 
-    console.log("Sending order data:", JSON.stringify(orderData));
+    console.log("Sending order data:", JSON.stringify(orderData, null, 2));
 
     try {
       // API call to create invoice
@@ -712,7 +743,6 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         } else if (selectedServiceType === "Delivery") {
           clearActiveDeliveryOrder();
         } else if (selectedServiceType === "Dine in") {
-          // Clear table for dine-in orders
           setSelectedTableId(null);
           onClearTable && onClearTable();
         }
@@ -737,7 +767,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         console.error("Response data:", error.response.data);
       }
       
-      throw error; // Re-throw to be handled by the calling function
+      throw error;
     }
   };
 
@@ -1144,6 +1174,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             amountEntered={amountEntered}
             calculateDiscountedTotal={calculateTotal}
             calculateBalance={calculateBalance}
+            showAmountFields={false}
           />
         </Col>
         <Col span={12}>
@@ -1191,10 +1222,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                     message.error({ content: "Payment failed. Please try again.", key: "cardPayment", duration: 3 });
                   });
               }}
-              disabled={
-                parseFloat(amountEntered) <
-                  parseFloat(calculateTotal()) || !selectedCardType
-              }
+              disabled={!selectedCardType}
             >
               Confirm Payment
             </Button>
