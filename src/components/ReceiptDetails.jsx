@@ -10,9 +10,10 @@ const ReceiptDetails = ({
   amountEntered,
   calculateDiscountedTotal,
   calculateBalance,
+  showAmountFields = true,
 }) => {
   // Calculate discount amount
-  const discountAmount = (cartData?.subTotal * (parseFloat(discount) || 0) / 100).toFixed(2);
+  const discountAmount = (parseFloat(cartData?.subTotal || 0) * (parseFloat(discount) || 0) / 100).toFixed(2);
 
   return (
     <div
@@ -63,24 +64,28 @@ const ReceiptDetails = ({
           </Text>
         </Col>
       </Row>
-      <Row gutter={[8, 12]}>
-        <Col span={12}><Text>Amount Entered:</Text></Col>
-        <Col span={12}><Text strong>RM {amountEntered}</Text></Col>
-      </Row>
-      <Row gutter={[8, 12]}>
-        <Col span={12}><Text>Balance:</Text></Col>
-        <Col span={12}>
-          <Text
-            style={{
-              color: calculateBalance() >= 0 ? "#52c41a" : "#ff4d4f",
-              fontWeight: "bold",
-            }}
-          >
-            RM {calculateBalance()}
-          </Text>
-        </Col>
-      </Row>
-      {parseFloat(amountEntered) >= parseFloat(calculateDiscountedTotal()) && (
+      {showAmountFields && (
+        <>
+          <Row gutter={[8, 12]}>
+            <Col span={12}><Text>Amount Entered:</Text></Col>
+            <Col span={12}><Text strong>RM {amountEntered}</Text></Col>
+          </Row>
+          <Row gutter={[8, 12]}>
+            <Col span={12}><Text>Balance:</Text></Col>
+            <Col span={12}>
+              <Text
+                style={{
+                  color: calculateBalance() >= 0 ? "#52c41a" : "#ff4d4f",
+                  fontWeight: "bold",
+                }}
+              >
+                RM {calculateBalance()}
+              </Text>
+            </Col>
+          </Row>
+        </>
+      )}
+      {showAmountFields && parseFloat(amountEntered) >= parseFloat(calculateDiscountedTotal()) && (
         <Text style={{ color: "#52c41a", display: "block", marginTop: "12px" }}>
           Thank you for your purchase! Visit again soon.
         </Text>
