@@ -4,7 +4,6 @@ export const DeliveryContext = createContext();
 
 export const DeliveryProvider = ({ children }) => {
   const [deliveryOrderCounter, setDeliveryOrderCounter] = useState(0);
-  const [deliveryOrderNumber, setDeliveryOrderNumber] = useState(`DL-${deliveryOrderCounter}`);
   const [deliveryOrders, setDeliveryOrders] = useState([]);
   const [activeDeliveryOrder, setActiveDeliveryOrder] = useState(null);
   const [deliveryCartDetails, setDeliveryCartDetails] = useState(null);
@@ -13,13 +12,10 @@ export const DeliveryProvider = ({ children }) => {
   const generateNextDeliveryOrderNumber = () => {
     const nextCounter = deliveryOrderCounter + 1;
     setDeliveryOrderCounter(nextCounter);
-    const newOrderNumber = `DL-${nextCounter}`;
-    setDeliveryOrderNumber(newOrderNumber);
-    return newOrderNumber;
+    return `DL-${nextCounter}`;
   };
 
   const generateUniqueGuid = () => {
-    // Generate a UUID v4 format
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
       const r = Math.random() * 16 | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -66,7 +62,6 @@ export const DeliveryProvider = ({ children }) => {
     console.log("Delivery context: switching to", serviceType);
     
     if (serviceType !== 'Delivery') {
-      // Clear all Delivery specific data
       clearActiveDeliveryOrder();
     }
     
@@ -75,8 +70,6 @@ export const DeliveryProvider = ({ children }) => {
 
   return (
     <DeliveryContext.Provider value={{ 
-      deliveryOrderNumber, 
-      setDeliveryOrderNumber,
       generateNextDeliveryOrderNumber,
       deliveryOrders,
       setDeliveryOrders,

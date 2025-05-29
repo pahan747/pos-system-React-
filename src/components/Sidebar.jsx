@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
-import "./styles.css";
-import { Link } from "react-router-dom";
+import "../assets/css/components/MainStyles.css";
+import { Link, useNavigate } from "react-router-dom";
 import OtherServicesModal from "./OtherServicesModal";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
@@ -10,7 +10,8 @@ const Sidebar = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [organizationData, setOrganizationData] = useState(null);
   const { selectedOrganizationId } = useContext(OrganizationContext);
-  const { accessToken } = useContext(AuthContext);
+  const { accessToken, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
   const BASE_URL = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
@@ -49,6 +50,11 @@ const Sidebar = () => {
     setIsModalVisible(false);
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <aside className="sidebar">
       <div className="logo-section">
@@ -57,7 +63,7 @@ const Sidebar = () => {
       </div>
       <ul className="nav-links">
         <li>
-          <Link to="#" className="active">
+          <Link to="/" className="active">
             <i className="fas fa-utensils"></i> Menu
           </Link>
         </li>
@@ -67,8 +73,8 @@ const Sidebar = () => {
           </Link>
         </li>
         <li>
-          <Link to="#">
-            <i className="fas fa-calendar-alt"></i> Reservation
+          <Link to="/orders">
+            <i className="fas fa-calendar-alt"></i> Orders
           </Link>
         </li>
         <li>
@@ -97,10 +103,10 @@ const Sidebar = () => {
           <p>Arlene McCoy</p>
         </div>
       </div>
-      <button className="logout-btn">Logout</button>
+      <button className="logout-btn" onClick={handleLogout}>Logout</button>
       <OtherServicesModal visible={isModalVisible} onClose={handleClose} />
     </aside>
   );
 };
 
-export default Sidebar;
+export default Sidebar; 

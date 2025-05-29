@@ -18,6 +18,14 @@ body {
     padding: 20px;
 }
 
+.container-invoice {
+    display: grid;
+    grid-template-columns: 1fr 4.5fr ;
+    height: calc(100vh - 80px); /* Leave space for bottom bar */
+    gap: 20px;
+    padding: 20px;
+}
+
 /* Sidebar */
 .sidebar {
     background-color: #ffffff;
@@ -26,7 +34,8 @@ body {
     flex-direction: column;
     justify-content: space-between;
     border-right: 1px solid #e6e6e6;
-    overflow-y: auto;
+    padding-bottom: 110px;
+    width: 250px;
 }
 
 .logo-section {
@@ -121,6 +130,23 @@ body {
     gap: 20px;
     overflow-y: auto;
 }
+
+.dropdown-container {
+    display: flex;
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 10px;
+}
+
+.dropdown-container h1 {
+    font-size: 25px;
+    font-weight: bold; 
+    color: #333;
+    margin: 0; 
+    padding: 0;
+    text-transform: uppercase; 
+    letter-spacing: 1px; 
+  }
 
 .header {
     display: flex;

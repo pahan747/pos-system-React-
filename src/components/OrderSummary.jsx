@@ -6,7 +6,6 @@ import { useCart } from "../context/CartContext";
 import { useTakeAway } from "../context/TakeAwayContext";
 import { useDelivery } from "../context/DeliveryContext"; // Imported DeliveryContext to manage Delivery orders like Take Away
 import axios from "axios";
-import "../assets/css/components/OrderSummary.css";
 import { Button, Input, Col, message } from "antd";
 import ReceiptDetails from "./ReceiptDetails";
 import PaymentKeypad from "./PaymentKeypad";
@@ -16,6 +15,7 @@ import { Typography } from "antd";
 import { useServiceType } from "../context/ServiceTypeContext";
 import CustomerCreationModal from "./CustomerCreationModal";
 import { useCustomer } from "../context/CustomerContext";
+import "../assets/css/components/OrderSummary.css";
 
 const { Title, Text } = Typography;
 
@@ -405,18 +405,60 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     });
   };
 
-  const handleQuantityIncrease = (index) => {
+  const handleQuantityIncrease = async (index) => {
     if (
       !cartData?.cartDetails?.[index] ||
       cartData.cartDetails[index].isKot !== 0
     )
       return;
-
-    setCartData((prev) => {
-      const newCartDetails = [...prev.cartDetails];
-      newCartDetails[index].qty += 1;
-      return { ...prev, cartDetails: newCartDetails };
-    });
+  
+    try {
+      const item = cartData.cartDetails[index];
+      const orderDetails = getOrderDetails();
+      if (!orderDetails?.id) {
+        message.error("No active order found");
+        return;
+      }
+  
+      // Determine which type of order we're dealing with
+      const params = {
+        Guid: orderDetails.id,
+        ProductId: item.productId,
+        Qty: 1, // Adding 1 more to existing quantity
+        cusId: selectedCustomer?.id,
+        name: item.name,
+        value: item.price,
+        ordertype: ["Dine in", "Take Away", "Delivery"].indexOf(orderDetails.type),
+        OrganizationsId: selectedOrganizationId,
+      };
+  
+      // Make API call to add to cart (which increases quantity)
+      await axios.post(
+        `${BASE_URL}Cart/add-to-cart`,
+        null,
+        {
+          params,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      // Update local state optimistically for better UX
+      setCartData((prev) => {
+        const newCartDetails = [...prev.cartDetails];
+        newCartDetails[index].qty += 1;
+        return { ...prev, cartDetails: newCartDetails };
+      });
+  
+      // Refresh cart details from server
+      await fetchCartDetails(true);
+      
+    } catch (error) {
+      console.error("Failed to increase quantity:", error);
+      message.error("Failed to update quantity. Please try again.");
+    }
   };
 
   const handleQuantityDecrease = (index) => {
@@ -460,16 +502,41 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     }
   };
 
-  const calculateDiscountedTotal = () => {
-    const subTotal = parseFloat(cartData?.subTotal || "0.00");
-    const discountPercentage = parseFloat(discount || "0") / 100;
-    return (subTotal - subTotal * discountPercentage).toFixed(2);
+  const calculateSubTotal = () => {
+    if (!cartData?.cartDetails) return "0.00";
+    return cartData.cartDetails.reduce((sum, item) => {
+      return sum + (item.price * item.qty);
+    }, 0).toFixed(2);
+  };
+
+  const calculateTotal = () => {
+    const subTotal = parseFloat(calculateSubTotal());
+    const tax = parseFloat(cartData?.tax || "0.00");
+    const service = parseFloat(cartData?.service || "0.00");
+    const discountValue = parseFloat(discount || "0");
+    
+    // Calculate discount amount (as a percentage of subtotal)
+    const discountAmount = (subTotal * (discountValue / 100));
+    
+    // Calculate final total
+    const finalTotal = (subTotal - discountAmount + tax + service).toFixed(2);
+    
+    console.log('Total Calculation:', {
+      subTotal,
+      tax,
+      service,
+      discountValue,
+      discountAmount,
+      finalTotal
+    });
+    
+    return finalTotal;
   };
 
   const calculateBalance = () =>
     (
       parseFloat(amountEntered || "0.00") -
-      parseFloat(calculateDiscountedTotal())
+      parseFloat(calculateTotal())
     ).toFixed(2);
 
   const handlePlaceOrder = async () => {
@@ -519,54 +586,128 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     else if (selectedPayment === "QR") setShowQRModal(true);
   };
 
-  const handlePaymentConfirm = async (method) => {
-    try {
-      const orderDetails = getOrderDetails();
-      if (!orderDetails?.id) {
-        throw new Error("No active order");
+  const handleKeypadClick = (value) => {
+    if (value === "C") {
+      setAmountEntered("0.00");
+    } else if (value === "OK") {
+      if (parseFloat(amountEntered) >= parseFloat(calculateTotal())) {
+        // Close the modal immediately for better UX
+        setShowCashModal(false);
+        
+        // Show processing message
+        message.loading({ content: "Processing payment...", key: "keypadPayment", duration: 0 });
+        
+        // Handle the payment
+        handlePaymentConfirm(selectedPayment)
+          .then(() => {
+            message.success({ content: `Payment successful via ${selectedPayment}!`, key: "keypadPayment", duration: 2 });
+          })
+          .catch((error) => {
+            console.error("Keypad payment error:", error);
+            message.error({ content: "Payment failed. Please try again.", key: "keypadPayment", duration: 3 });
+          });
+      } else {
+        message.warning("Entered amount is less than the total amount");
       }
+    } else {
+      const currentAmount =
+        amountEntered === "0.00" ? "" : amountEntered.replace(".00", "");
+      const newValue = currentAmount + value;
+      setAmountEntered(newValue + ".00");
+    }
+  };
 
-      const paymentTypeMap = { Cash: 0, Card: 1, QR: 2 };
-      const details = cartData.cartDetails
-        .filter((item) => item.qty > 0 && item.price > 0)
-        .map((item) => ({
-          productId: item.productId || "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-          qty: item.qty || 0,
-          price: item.price || 0,
-          amount: (item.qty || 0) * (item.price || 0),
-          status: 0,
-          spicy: "",
-        }));
+  const handlePaymentConfirm = async (method) => {
+    if (!method) {
+      console.error("Payment method not selected");
+      throw new Error("Payment method not selected");
+    }
 
-      const subTotal = parseFloat(cartData?.subTotal || "0.00");
-      const discountAmount = subTotal * (parseFloat(discount || "0") / 100);
-      const total = (
-        subTotal +
-        parseFloat(cartData?.tax || "0.00") +
-        parseFloat(cartData?.service || "0.00") -
-        discountAmount
-      ).toFixed(2);
+    const orderDetails = getOrderDetails();
+    if (!orderDetails?.id) {
+      console.error("No active order");
+      throw new Error("No active order found");
+    }
 
-      const orderData = {
-        invoiceNumber: `INV-${Date.now()}`,
-        tableId: orderDetails.id,
-        type: ["Dine in", "Take Away", "Delivery"].indexOf(orderDetails.type),
-        paymentType: paymentTypeMap[method],
+    // Updated payment type mapping to match API expectations
+    const paymentTypeMap = { 
+      Cash: 1,  // Changed from 0 to 1
+      Card: 2,  // Changed from 1 to 2
+      QR: 3     // Changed from 2 to 3
+    };
+
+    if (paymentTypeMap[method] === undefined) {
+      console.error("Invalid payment method:", method);
+      throw new Error("Invalid payment method");
+    }
+
+    // Ensure we have valid cart data
+    if (!cartData || !cartData.cartDetails || cartData.cartDetails.length === 0) {
+      console.error("Cart is empty");
+      throw new Error("No items in cart");
+    }
+
+    const details = cartData.cartDetails
+      .filter((item) => item.qty > 0 && item.price > 0)
+      .map((item) => ({
+        productId: item.productId,
+        qty: item.qty || 0,
+        price: item.price || 0,
+        amount: (item.qty || 0) * (item.price || 0),
         status: 0,
-        dueDate: new Date().toISOString(),
-        userId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-        noOfItems: details.length,
-        total: parseFloat(total),
-        discount: parseFloat(discount || "0"),
-        tax: parseFloat(cartData?.tax || "0.00"),
-        subTotal: subTotal,
-        serviceCharge: parseFloat(cartData?.service || "0.00"),
-        paidAmount: parseFloat(amountEntered),
-        customerID: selectedCustomer?.id,
-        organizationId: selectedOrganizationId,
-        details: details,
-      };
+        spicy: item.note || "",
+        name: item.name || "",
+      }));
 
+    if (!details.length) {
+      console.error("No valid items in cart");
+      throw new Error("No valid items in cart");
+    }
+
+    const subTotal = parseFloat(calculateSubTotal());
+    const discountPercentage = parseFloat(discount || "0");
+    const discountAmount = subTotal * (discountPercentage / 100);
+    const tax = parseFloat(cartData?.tax || "0.00");
+    const serviceCharge = parseFloat(cartData?.service || "0.00");
+    const totalAmount = (subTotal + tax + serviceCharge - discountAmount).toFixed(2);
+    
+    // For Cash payments, use amountEntered, for others use totalAmount
+    const paidAmount = method === "Cash" 
+      ? parseFloat(amountEntered || "0.00")
+      : parseFloat(totalAmount);
+
+    // Validate paid amount
+    if (method === "Cash" && paidAmount < parseFloat(totalAmount)) {
+      throw new Error("Paid amount is less than total amount");
+    }
+
+    // Create orderData object with updated mappings
+    const orderData = {
+      invoiceNumber: `INV-${Date.now()}`,
+      tableId: orderDetails.id,
+      type: orderDetails.type === "Dine in" ? 1 : 
+            orderDetails.type === "Take Away" ? 2 : 
+            orderDetails.type === "Delivery" ? 3 : 1, // Default to Dine in if unknown
+      paymentType: paymentTypeMap[method],
+      status: 1, // Changed from 0 to 1 to indicate completed order
+      dueDate: new Date().toISOString(),
+      userId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      noOfItems: details.length,
+      total: parseFloat(totalAmount),
+      discount: discountPercentage,
+      tax: tax,
+      subTotal: subTotal,
+      serviceCharge: serviceCharge,
+      paidAmount: paidAmount,
+      customerID: selectedCustomer?.id || "00000000-0000-0000-0000-000000000000",
+      organizationId: selectedOrganizationId,
+      details: details,
+    };
+
+    console.log("Sending order data:", JSON.stringify(orderData, null, 2));
+
+    try {
+      // API call to create invoice
       const response = await axios.post(
         `${BASE_URL}Invoice/create-invoice-new`,
         orderData,
@@ -578,43 +719,103 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         }
       );
 
+      console.log("Payment response:", response);
+
+      // Process payment result
       if (response.status === 200 || response.status === 201) {
-        message.success(`Payment successful via ${method}!`);
-        resetCartState();
-        setShowCashModal(false);
-        setShowCardModal(false);
-        setShowQRModal(false);
-        setAmountEntered("0.00");
-        setDiscount("0");
-        setSelectedCardType(null);
-        setSelectedPayment(null);
-        // Clear active Delivery order after payment, like Take Away
+        // Delete cart after successful payment
+        try {
+          await axios.delete(`${BASE_URL}Cart/delete-cart`, {
+            params: { tableId: orderDetails.id },
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+        } catch (error) {
+          console.error("Failed to delete cart:", error);
+          // Continue with other operations even if cart deletion fails
+        }
+        
+        // Clear active orders based on service type
         if (selectedServiceType === "Take Away") {
           clearActiveOrder();
         } else if (selectedServiceType === "Delivery") {
           clearActiveDeliveryOrder();
+        } else if (selectedServiceType === "Dine in") {
+          setSelectedTableId(null);
+          onClearTable && onClearTable();
         }
+        
+        // Reset UI state
+        resetCartState();
+        setAmountEntered("0.00");
+        setDiscount("0");
+        setSelectedCardType(null);
+        setSelectedPayment(null);
+        
+        return response;
       } else {
-        throw new Error("Payment failed");
+        throw new Error(`Unexpected response status: ${response.status}`);
       }
-    } catch (err) {
-      console.error("Payment error:", err);
-      message.error("Failed to process payment. Please try again.");
+    } catch (error) {
+      console.error("Payment API error:", error);
+      
+      // Log detailed error information
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
+      }
+      
+      throw error;
     }
   };
 
-  const handleKeypadClick = (value) => {
-    if (value === "C") {
-      setAmountEntered("0.00");
-    } else if (value === "OK") {
-      if (parseFloat(amountEntered) >= parseFloat(calculateDiscountedTotal())) {
-        handlePaymentConfirm(selectedPayment);
+  const handleDeleteItem = async (index) => {
+    if (!cartData?.cartDetails?.[index]) return;
+
+    try {
+      const item = cartData.cartDetails[index];
+      const orderDetails = getOrderDetails();
+      if (!orderDetails?.id) {
+        message.error("No active order found");
+        return;
       }
-    } else {
-      const currentAmount =
-        amountEntered === "0.00" ? "" : amountEntered.replace(".00", "");
-      const newValue = currentAmount + value;
-      setAmountEntered(newValue + ".00");
+
+      // Make the API call with the exact parameter names expected by the API
+      const response = await axios.delete(
+        `${BASE_URL}Cart/delete-cart-item`,
+        {
+          params: {
+            tableId: orderDetails.id,
+            productId: item.productId,
+            organizationId: selectedOrganizationId,
+          },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // Only update UI if API call is successful
+      if (response.status === 200 || response.status === 204) {
+        // Update local state
+        setCartData((prev) => {
+          const newCartDetails = [...prev.cartDetails];
+          newCartDetails.splice(index, 1);
+          return { ...prev, cartDetails: newCartDetails };
+        });
+
+        // Refresh cart details from server
+        await fetchCartDetails(true);
+        message.success("Item removed successfully");
+      }
+    } catch (error) {
+      console.error("Failed to delete item:", error);
+      message.error("Failed to remove item. Please try again.");
+      // Refresh cart to ensure UI is in sync
+      await fetchCartDetails(true);
     }
   };
 
@@ -635,6 +836,9 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
         case "addNote":
           handleAddNoteToDatabase(index);
           break;
+        case "delete":
+          handleDeleteItem(index);
+          break;
         default:
           console.warn("Unknown update action:", action);
       }
@@ -645,6 +849,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       handleQuantityDecrease,
       handleNoteInputChange,
       handleAddNoteToDatabase,
+      handleDeleteItem,
     ]
   );
 
@@ -669,7 +874,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
     if (selectedServiceType === "Delivery" && !activeDeliveryOrder?.id) {
       return <NoDeliveryOrderSelectedView />;
     }
-
+ 
     if (
       !cartData ||
       (cartData && (!cartData.cartDetails || cartData.cartDetails.length === 0))
@@ -694,7 +899,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               <p>Table Section</p>
               <div className="edit-icon" onClick={handleCustomerIconClick}>
                 <i
-                  className="fa-edit fas"
+                  className="fa-user fas"
                   onClick={handleCustomerIconClick}
                 ></i>
               </div>
@@ -732,7 +937,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               <p>Order Section</p>
               <div className="edit-icon" onClick={handleCustomerIconClick}>
                 <i
-                  className="fa-shopping-bag fas"
+                  className="fa-user fas"
                   onClick={handleCustomerIconClick}
                 ></i>
               </div>
@@ -770,7 +975,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
               <p>Delivery Section</p>
               <div className="edit-icon" onClick={handleCustomerIconClick}>
                 <i
-                  className="fa-motorcycle fas"
+                  className="fa-user fas"
                   onClick={handleCustomerIconClick}
                 ></i>
               </div>
@@ -825,7 +1030,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
       {cartData && !cartLoading && cartData.cartDetails.length > 0 && (
         <div className="totals">
           <p>
-            SubTotal: <span>${(cartData.subTotal || 0).toFixed(2)}</span>
+            SubTotal: <span>${calculateSubTotal()}</span>
           </p>
           <p>
             Tax: <span>${(cartData.tax || 0).toFixed(2)}</span>
@@ -839,7 +1044,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             </p>
           )}
           <h3>
-            Total: <span>${(cartData.subTotal || 0).toFixed(2)}</span>
+            Total: <span>${calculateTotal()}</span>
           </h3>
         </div>
       )}
@@ -853,7 +1058,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             }`}
             onClick={() => setSelectedPayment(method)}
           >
-            <i
+            {/* <i
               className={`fas fa-${
                 method === "Cash"
                   ? "money-bill-wave"
@@ -861,7 +1066,8 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                   ? "credit-card"
                   : "qrcode"
               }`}
-            ></i>{" "}
+   
+                     ></i>{" "} */}
             {method === "Card" ? "Credit/Debit Card" : method}
           </button>
         ))}
@@ -896,7 +1102,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             discount={discount}
             setDiscount={setDiscount}
             amountEntered={amountEntered}
-            calculateDiscountedTotal={calculateDiscountedTotal}
+            calculateDiscountedTotal={calculateTotal}
             calculateBalance={calculateBalance}
           />
         </Col>
@@ -922,10 +1128,26 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                 fontSize: "16px",
                 fontWeight: "bold",
               }}
-              onClick={() => handlePaymentConfirm("Cash")}
+              onClick={() => {
+                // Close the modal immediately for better UX
+                setShowCashModal(false);
+                
+                // Show processing message
+                message.loading({ content: "Processing payment...", key: "cashPayment", duration: 0 });
+                
+                // Handle the payment
+                handlePaymentConfirm("Cash")
+                  .then(() => {
+                    message.success({ content: "Payment successful via Cash!", key: "cashPayment", duration: 2 });
+                  })
+                  .catch((error) => {
+                    console.error("Cash payment error:", error);
+                    message.error({ content: "Payment failed. Please try again.", key: "cashPayment", duration: 3 });
+                  });
+              }}
               disabled={
                 parseFloat(amountEntered) <
-                parseFloat(calculateDiscountedTotal())
+                parseFloat(calculateTotal())
               }
             >
               Pay Now
@@ -950,8 +1172,9 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             discount={discount}
             setDiscount={setDiscount}
             amountEntered={amountEntered}
-            calculateDiscountedTotal={calculateDiscountedTotal}
+            calculateDiscountedTotal={calculateTotal}
             calculateBalance={calculateBalance}
+            showAmountFields={false}
           />
         </Col>
         <Col span={12}>
@@ -982,11 +1205,24 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                 fontSize: "16px",
                 fontWeight: "bold",
               }}
-              onClick={() => handlePaymentConfirm("Card")}
-              disabled={
-                parseFloat(amountEntered) <
-                  parseFloat(calculateDiscountedTotal()) || !selectedCardType
-              }
+              onClick={() => {
+                // Close the modal immediately for better UX
+                setShowCardModal(false);
+                
+                // Show processing message
+                message.loading({ content: "Processing payment...", key: "cardPayment", duration: 0 });
+                
+                // Handle the payment
+                handlePaymentConfirm("Card")
+                  .then(() => {
+                    message.success({ content: "Payment successful via Card!", key: "cardPayment", duration: 2 });
+                  })
+                  .catch((error) => {
+                    console.error("Card payment error:", error);
+                    message.error({ content: "Payment failed. Please try again.", key: "cardPayment", duration: 3 });
+                  });
+              }}
+              disabled={!selectedCardType}
             >
               Confirm Payment
             </Button>
@@ -1009,7 +1245,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
             discount={discount}
             setDiscount={setDiscount}
             amountEntered={amountEntered}
-            calculateDiscountedTotal={calculateDiscountedTotal}
+            calculateDiscountedTotal={calculateTotal}
             calculateBalance={calculateBalance}
           />
         </Col>
@@ -1051,10 +1287,26 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
                 fontSize: "16px",
                 fontWeight: "bold",
               }}
-              onClick={() => handlePaymentConfirm("QR")}
+              onClick={() => {
+                // Close the modal immediately for better UX
+                setShowQRModal(false);
+                
+                // Show processing message
+                message.loading({ content: "Processing payment...", key: "qrPayment", duration: 0 });
+                
+                // Handle the payment
+                handlePaymentConfirm("QR")
+                  .then(() => {
+                    message.success({ content: "Payment successful via QR!", key: "qrPayment", duration: 2 });
+                  })
+                  .catch((error) => {
+                    console.error("QR payment error:", error);
+                    message.error({ content: "Payment failed. Please try again.", key: "qrPayment", duration: 3 });
+                  });
+              }}
               disabled={
                 parseFloat(amountEntered) <
-                parseFloat(calculateDiscountedTotal())
+                parseFloat(calculateTotal())
               }
             >
               Confirm Payment
@@ -1158,6 +1410,13 @@ const CartItemsList = ({ cartData, onUpdateItem }) => {
               onClick={() => onUpdateItem(index, "increase")}
             >
               +
+            </button>
+            <button
+              className="delete-btn"
+              onClick={() => onUpdateItem(index, "delete")}
+              disabled={item.isKot !== 0}
+            >
+              <i className="fas fa-trash"></i>
             </button>
           </div>
         </div>

@@ -9,7 +9,8 @@ import { TableContext } from "../context/TableContext";
 import { useCart } from "../context/CartContext";
 import { useServiceType } from "../context/ServiceTypeContext";
 import { useTakeAway } from "../context/TakeAwayContext";
-import { useDelivery } from "../context/DeliveryContext"; // NEW: Added Delivery context
+import { useDelivery } from "../context/DeliveryContext"; 
+import { useCustomer } from "../context/CustomerContext";
 
 // Constants
 const SERVICE_TYPE_MAP = {
@@ -37,7 +38,8 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
   const { setCartData, setCartLoading, setCartError } = useCart();
   const { selectedServiceType } = useServiceType();
   const { activeTakeAwayOrder } = useTakeAway();
-  const { activeDeliveryOrder } = useDelivery(); // NEW: Added Delivery context hook
+  const { activeDeliveryOrder } = useDelivery(); 
+  const { selectedCustomer } = useCustomer();
 
   // API Configuration
   const getApiConfig = useCallback(
@@ -114,7 +116,7 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
       Guid: selectedTableId,
       ProductId: product.id,
       Qty: 1,
-      cusId: CUSTOMER_ID,
+      cusId: selectedCustomer?.id,
       name: product.name,
       value: product.price,
       ordertype: orderType,
@@ -136,7 +138,7 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
       Guid: activeTakeAwayOrder?.id,
       ProductId: product.id,
       Qty: 1,
-      cusId: CUSTOMER_ID,
+      cusId: selectedCustomer?.id,
       name: product.name,
       value: product.price,
       ordertype: orderType,
@@ -158,7 +160,7 @@ const MenuItems = ({ selectedCategory, searchTerm, refetchTables }) => {
       Guid: activeDeliveryOrder?.id,
       ProductId: product.id,
       Qty: 1,
-      cusId: CUSTOMER_ID,
+      cusId: selectedCustomer?.id,
       name: product.name,
       value: product.price,
       ordertype: orderType,

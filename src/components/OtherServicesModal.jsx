@@ -117,7 +117,7 @@ const OtherServicesModal = ({ visible, onClose }) => {
       const params = {
         Guid: guid,
         Qty: 1,
-        cusId: "80ebf3b0-a2d7-49d2-6a06-08dcda15281e",
+        cusId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
         name: serviceName,
         value: amount,
         ordertype: orderType

@@ -776,3 +776,30 @@
   pointer-events: none;
   transition: opacity 0.3s ease;
 }
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #ff4d4f;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.delete-btn:hover {
+  color: #ff7875;
+  transform: scale(1.1);
+}
+
+.delete-btn:disabled {
+  color: #d9d9d9;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.delete-btn i {
+  font-size: 16px;
+}

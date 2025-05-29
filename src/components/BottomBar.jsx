@@ -1,14 +1,14 @@
-// src/components/BottomBar.js
 import React, { useContext, useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
-import "../assets/css/components/BottomBar.css";
 import { TableContext } from "../context/TableContext";
 import { useServiceType } from "../context/ServiceTypeContext";
 import { useTakeAway } from "../context/TakeAwayContext";
 import { message } from "antd";
 import { useDelivery } from "../context/DeliveryContext";
 import { useCart } from "../context/CartContext";
+import { useCustomer } from "../context/CustomerContext";
+import "../assets/css/components/BottomBar.css";
 
 const SERVICE_TYPE_MAP = {
   "Dine in": 0,
@@ -24,6 +24,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
   const { addTakeAwayOrder, handleTakeAwayOrderSelect, clearActiveOrder } = useTakeAway();
   const { addDeliveryOrder, handleDeliveryOrderSelect, clearActiveDeliveryOrder } = useDelivery(); 
   const { cartData } = useCart();
+  const { selectedCustomer } = useCustomer();
   const BASE_URL = process.env.REACT_APP_API_URL;
   const organizationId = "1e7071f0-dacb-4a98-f264-08dcb066d923";
 
@@ -68,7 +69,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
           tableId: table.name,
           name: table.fullName,
           items: table.count,
-          status: table.status === 99 ? "Process" : "Open",
+          status: table.count > 0 ? "Process" : "Open",
         }))
         .sort((a, b) =>
           a.tableId.localeCompare(b.tableId, undefined, { numeric: true })
@@ -84,6 +85,41 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
       setDineInLoading(false);
     }
   }, [accessToken, BASE_URL, organizationId, cartData]);
+
+  // Add new function to update table status
+  const updateTableStatus = useCallback((tableId, items) => {
+    setTables(prevTables => 
+      prevTables.map(table => 
+        table.id === tableId 
+          ? { ...table, status: items > 0 ? "Process" : "Open" }
+          : table
+      )
+    );
+  }, []);
+
+  // Add new function to fetch cart details
+  const fetchCartDetails = useCallback(async (guid) => {
+    if (!guid || !accessToken) return;
+
+    try {
+      const config = {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      };
+
+      const response = await axios.get(
+        `${BASE_URL}Cart/get-cart-details?Guid=${guid}&OrganizationsId=${organizationId}`,
+        config
+      );
+
+      return response.data?.noOfItems || 0;
+    } catch (err) {
+      console.error("Error fetching cart details:", err);
+      return 0;
+    }
+  }, [accessToken, BASE_URL, organizationId]);
 
   // Take-away specific functions
   const fetchTakeawayOrders = useCallback(async () => {
@@ -106,16 +142,24 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
         config
       );
 
-      const transformedOrders = response.data
-        .map((order, index) => ({
-          id: order.tableId,
-          tableId: `TA ${index + 1}`,
-          name: `Take Away ${index + 1}`,
-          items: "0",
-          status: "Open",
-          createUtc: order.createUtc,
-        }))
-        .sort((a, b) => new Date(a.createUtc) - new Date(b.createUtc));
+      // Fetch cart details for each order
+      const ordersWithCartDetails = await Promise.all(
+        response.data.map(async (order, index) => {
+          const itemCount = await fetchCartDetails(order.tableId);
+          return {
+            id: order.tableId,
+            tableId: `TA ${index + 1}`,
+            name: `Take Away ${index + 1}`,
+            items: itemCount,
+            status: itemCount > 0 ? "Process" : "Open",
+            createUtc: order.createUtc,
+          };
+        })
+      );
+
+      const transformedOrders = ordersWithCartDetails.sort(
+        (a, b) => new Date(a.createUtc) - new Date(b.createUtc)
+      );
 
       setTakeawayOrders(transformedOrders);
     } catch (err) {
@@ -126,14 +170,14 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     } finally {
       setTakeawayLoading(false);
     }
-  }, [accessToken, BASE_URL, organizationId]);
+  }, [accessToken, BASE_URL, organizationId, fetchCartDetails]);
 
   const handleAddTakeAwayOrder = async () => {
     try {
       const newOrder = addTakeAwayOrder();
 
       await axios.post(
-        `${BASE_URL}Cart/add-takeaway-order?tableId=${newOrder.id}&customerId=80ebf3b0-a2d7-49d2-6a06-08dcda15281e&orderType=1`,
+          `${BASE_URL}Cart/add-takeaway-order?tableId=${newOrder.id}&customerId=${selectedCustomer?.id}&orderType=1`,
         null,
         {
           headers: {
@@ -162,34 +206,51 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
       if (!accessToken) throw new Error("Access token missing. Please log in.");
       setDeliveryLoading(true);
 
-      const config = { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } };
-      const response = await axios.get(`${BASE_URL}Cart/get-delivery-orders?OrganizationsId=${organizationId}`, config);
+      const config = { 
+        headers: { 
+          Authorization: `Bearer ${accessToken}`, 
+          "Content-Type": "application/json" 
+        } 
+      };
+      
+      const response = await axios.get(
+        `${BASE_URL}Cart/get-delivery-orders?OrganizationsId=${organizationId}`, 
+        config
+      );
 
-      const transformedOrders = response.data
-        .map((order, index) => ({
-          id: order.tableId,
-          tableId: `DL ${index + 1}`,
-          name: `Delivery ${index + 1}`,
-          items: "0",
-          status: "Open",
-          createUtc: order.createUtc,
-        }))
-        .sort((a, b) => new Date(a.createUtc) - new Date(b.createUtc));
+      // Fetch cart details for each order
+      const ordersWithCartDetails = await Promise.all(
+        response.data.map(async (order, index) => {
+          const itemCount = await fetchCartDetails(order.tableId);
+          return {
+            id: order.tableId,
+            tableId: `DL ${index + 1}`,
+            name: `Delivery ${index + 1}`,
+            items: itemCount,
+            status: itemCount > 0 ? "Process" : "Open",
+            createUtc: order.createUtc,
+          };
+        })
+      );
 
-      setDeliveryOrders(transformedOrders); // Local state
+      const transformedOrders = ordersWithCartDetails.sort(
+        (a, b) => new Date(a.createUtc) - new Date(b.createUtc)
+      );
+
+      setDeliveryOrders(transformedOrders);
     } catch (err) {
       console.error("Error fetching delivery orders:", err);
       message.error(err.response?.data?.message || "Failed to load delivery orders");
     } finally {
       setDeliveryLoading(false);
     }
-  }, [accessToken, BASE_URL, organizationId]);
+  }, [accessToken, BASE_URL, organizationId, fetchCartDetails]);
 
   const handleAddDeliveryOrder = async () => {
     try {
       const newOrder = addDeliveryOrder(); // Still use context to generate order
       await axios.post(
-        `${BASE_URL}Cart/add-delivery-order?tableId=${newOrder.id}&customerId=80ebf3b0-a2d7-49d2-6a06-08dcda15281e&orderType=2`,
+        `${BASE_URL}Cart/add-delivery-order?tableId=${newOrder.id}&customerId=${selectedCustomer?.id}&orderType=2`,
         null,
         { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
       );
@@ -372,7 +433,7 @@ const BottomBar = ({ onTableSelect, onRefetchTables }) => {
     } else if (selectedServiceType === "Delivery") {
       fetchDeliveryOrders();
     }
-  }, [selectedServiceType, fetchTakeawayOrders, fetchDeliveryOrders]);
+  }, [selectedServiceType, fetchTakeawayOrders, fetchDeliveryOrders, cartData]);
 
   // Main render
   const renderBottomBar = () => {
