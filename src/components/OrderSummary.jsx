@@ -553,7 +553,7 @@ const OrderSummary = ({ selectedTable, onClearTable }) => {
 
     try {
       await axios.post(
-        `${BASE_URL}Cart/place-order?TableId=${orderDetails.id}`,
+        `${BASE_URL}Cart/place-order?TableId=${orderDetails.id}&OrganizationId=${selectedOrganizationId}`,
         {},
         {
           headers: {
